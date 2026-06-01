@@ -22,3 +22,32 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# ==========================================
+# 여기서부터 필수 추가 내용 (Spring Boot, Gradle, IntelliJ, Mac)
+# ==========================================
+
+# Gradle / Build
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Secrets / Config
+application-secret.yml
+application-secret*.yml
+*secret*.yml
+*.env
