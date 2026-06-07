@@ -51,3 +51,7 @@ application-secret.yml
 application-secret*.yml
 *secret*.yml
 *.env
+
+.env.data
+.env.prod
+docker/.env*

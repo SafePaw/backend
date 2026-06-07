@@ -32,10 +32,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	runtimeOnly 'org.postgresql:postgresql'
 
-	// Flyway
-	implementation 'org.flywaydb:flyway-database-postgresql'
-	implementation 'org.flywaydb:flyway-core' // DB version 관리
-
 	// GPS 데이터 처리
 	implementation 'org.hibernate.orm:hibernate-spatial'
 
@@ -51,6 +47,21 @@ dependencies {
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// JWT 발급/검증
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly    'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly    'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// OAuth HTTP 호출 (Kakao/Naver) — WebClient
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+	// Google idToken 서명 검증
+	implementation 'com.google.api-client:google-api-client:2.7.0'
+
+	// 테스트 — Security 인증 모킹, WireMock 으로 IdP 응답 stub
+	testImplementation 'org.springframework.security:spring-security-test'
+	testImplementation 'org.wiremock:wiremock-standalone:3.9.1'
 }
 
 tasks.named('test') {

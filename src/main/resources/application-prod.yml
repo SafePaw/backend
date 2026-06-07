@@ -1,0 +1,45 @@
+spring:
+  config:
+    import: optional:classpath:application-secret.yml
+
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/safepaw?sslmode=prefer
+    username: safepaw
+    password: ${POSTGRES_PASSWORD}
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      timeout: 2s
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+safepaw:
+  jwt:
+    access-expiration-minutes: 30
+    refresh-expiration-days: 14
+  storage:
+    provider: minio
+    region: us-east-1
+    endpoint: http://127.0.0.1:9000
+    public-endpoint: http://168.107.2.91:9000
+    access-key: ${MINIO_ROOT_USER}
+    secret-key: ${MINIO_ROOT_PASSWORD}
+    path-style-access: true
+    bucket-markers: dog-markers
+    bucket-share-cards: share-cards
+    bucket-presets: presets
+    public-base-url: http://168.107.2.91:9000
