@@ -18,9 +18,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Logger;
 
 @Slf4j
 @Service
@@ -30,22 +28,28 @@ public class SocialAuthService {
 
     private final OAuthClientResolver oAuthClientResolver;
     private final UserRepository userRepository;
-    private final SocialIdentityRepository SocialIdentityRepository;
+    private final SocialIdentityRepository socialIdentityRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
 
     // 토큰 검증 및 초기 설정
     public AuthTokenResponse loginOrSignup(SocialLoginRequest req, String userAgent) {
         SocialProvider provider = req.provider(); // 종류
-        String token = req.tokenForProvider(); // 토큰
-        if (token == null || token.isBlank()) {
-            throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "토큰이 비어있습니다.");
+        String code = req.authorizationCode(); // authorization code
+        String redirectUri = req.redirectUri();
+
+        if (code == null || code.isBlank()) {
+            throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "authorizationCode가 비어있습니다.");
+        }
+
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "redirectUri가 비어있습니다.");
         }
 
         OAuthClient client = oAuthClientResolver.resolve(provider);
-        OAuthUserInfo info = client.verify(token); // 검증
+        OAuthUserInfo info = client.verifyWithCode(code, redirectUri); // 검증
 
-        User user = SocialIdentityRepository
+        User user = socialIdentityRepository
                 .findByProviderAndProviderUserId(provider, info.providerUserId()) // 아이디 존재하면, 로그인
                 .map(SocialIdentity::getUser)
                 .orElseGet(() -> createNewSocialUser(info)); // 회원 가입 로직
@@ -55,7 +59,7 @@ public class SocialAuthService {
         String accessToken = jwtTokenProvider.issueAccessToken(user.getId());
         String refreshToken = refreshTokenService.issueAndStore(user, userAgent);
 
-        boolean dogSetupRequired = true; // 나중에 true false 로직 구현
+        boolean dogSetupRequired = true; // set3.md에서 수정할 예정임
 
         return new AuthTokenResponse( // response dto
                 accessToken,
@@ -66,7 +70,6 @@ public class SocialAuthService {
 
     // 계정 생성
     public User createNewSocialUser(OAuthUserInfo info) {
-
         String nickname = ensureUniqueNickname(info.nickname());
         User user = User.createSocial(
                 info.provider().toAuthProvider(),
@@ -80,7 +83,7 @@ public class SocialAuthService {
                 .provider(info.provider())
                 .providerUserId(info.providerUserId())
                 .build();
-        SocialIdentityRepository.save(socialIdentity);
+        socialIdentityRepository.save(socialIdentity);
         log.info("신규 소셜 가입 : userId={}, provider={}", user.getId(), info.provider());
         return user;
 

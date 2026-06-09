@@ -7,6 +7,6 @@ public interface OAuthClient {
     // 소셜 담당
     SocialProvider support();
 
-    // 토큰 검증 후 소셜 유저 정보 반환
-    OAuthUserInfo verify(String Token);
+    // authorization code로 변경
+    OAuthUserInfo verifyWithCode(String authorizationCode, String redirectUri);
 }
