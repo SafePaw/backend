@@ -2,24 +2,21 @@ package com.ne7k.safepaw.auth.dto.request;
 
 import com.ne7k.safepaw.auth.domain.SocialProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 // swagger ui api 설명 표시
-@Schema(description = "소셜 로그인 요청 - kakao/naver은 access token, google은 idToken 사용함")
+@Schema(description = "소셜 로그인 요청 - authorization code")
 public record SocialLoginRequest(
 
         @Schema(example = "KAKAO")
         @NotNull SocialProvider provider,
 
-        @Schema(description = "kakao/naver이 발급한 access token")
-        String accessToken,
+        @Schema(description = "IDP redirect 후에 callback url code parameter")
+        @NotBlank String authorizationCode,
 
-        @Schema(description = "google이 발급한 idToken")
-        String idToken
+        @Schema(description = "authorization 요청 시 사용한 redirect uri")
+        @NotBlank String redirectUri
 
 ) {
-
-    public String tokenForProvider() {
-        return provider == SocialProvider.GOOGLE ? idToken : accessToken;
-    }
 }

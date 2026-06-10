@@ -13,18 +13,30 @@ import org.springframework.web.reactive.function.client.WebClientException;
 import org.springframework.http.HttpHeaders;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 
 @Component
 public class KakaoOAuthClient implements OAuthClient {
 
-    private final WebClient webClient;
+    private final WebClient tokenClient;
+    private final WebClient userInfoClient;
+    private final String clientId;
+    private final String clientSecret;
 
     public KakaoOAuthClient(
             WebClient.Builder builder,
             // value로 yml 값 읽어옴
-            @Value("${safepaw.oauth.kakao.user-info-uri}") String userInfoUri
-            ) {
-        this.webClient = builder.baseUrl(userInfoUri).build();
+            @Value("${safepaw.oauth.kakao.token-uri}") String tokenUri,
+            @Value("${safepaw.oauth.kakao.user-info-uri}") String userInfoUri,
+            @Value("${safepaw.oauth.kakao.client-id}") String clientId,
+            @Value("${safepaw.oauth.kakao.client-secret}") String clientSecret
+    ) {
+        this.tokenClient = builder.baseUrl(tokenUri).build();
+        this.userInfoClient = builder.baseUrl(userInfoUri).build();
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
     }
 
     @Override
@@ -32,31 +44,67 @@ public class KakaoOAuthClient implements OAuthClient {
         return SocialProvider.KAKAO;
     }
 
-    // get 요청
+    // code -> access token
     @Override
-    @SuppressWarnings("unchecked") // 캐스팅시 컴파일 끄기
-    public OAuthUserInfo verify(String accessToken) {
+    public OAuthUserInfo verifyWithCode(String authorizationCode, String redirectUri) {
+        String accessToken = exchangeCodeForAccessToken(authorizationCode, redirectUri);
+        return verifyAccessToken(accessToken);
+    }
+
+    @SuppressWarnings("unchecked")
+    //POST kauth/oauth/token (authorization_code)
+    private String exchangeCodeForAccessToken(String code, String redirectUri) {
         try {
-            Map<String, Object> body = webClient.get()
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("grant_type", "authorization_code");
+            form.add("client_id", clientId);
+            form.add("client_secret", clientSecret);
+            form.add("redirect_uri", redirectUri);
+            form.add("code", code);
+
+            Map<String, Object> body = tokenClient.post()
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData(form))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, res -> res.createException()
+                            .flatMap(ex -> reactor.core.publisher.Mono.error(
+                                    new BusinessException(ErrorCode.AUTH_INVALID_ID_TOKEN,
+                                            "카카오 authorization code 교환 실패"))))
+                    .onStatus(HttpStatusCode::is5xxServerError, res -> res.createException()
+                            .flatMap(ex -> reactor.core.publisher.Mono.error(
+                                    new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED,
+                                            "카카오 token API 호출 실패"))))
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (body == null || body.get("access_token") == null) {
+                throw new BusinessException(ErrorCode.AUTH_INVALID_ID_TOKEN, "카카오 access_token 누락");
+            }
+            return String.valueOf(body.get("access_token"));
+
+        } catch (WebClientException e) {
+            // BusinessException 은 catch 없이 그대로 전파
+            throw new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED, "카카오 token API 네트워크 오류");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    // kakao user/me 파싱 동일
+    private OAuthUserInfo verifyAccessToken(String accessToken) {
+        try {
+            Map<String, Object> body = userInfoClient.get()
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .accept(MediaType.APPLICATION_JSON)
-                    .retrieve() // 실행 단계
-                    // 상황별 에러
-                    .onStatus(HttpStatusCode::is4xxClientError,
-                            res -> res.createException()
-                                    // reactor 비동기 라이브러리, mono 박스
-                                    .flatMap(ex -> reactor.core.publisher.Mono.error(
-                                            new BusinessException(ErrorCode.AUTH_INVALID_ID_TOKEN,
-                                                    "카카오 access Token 검증 실패")
-                                    ))
-                    )
-                    .onStatus(HttpStatusCode::is5xxServerError,
-                            res -> res.createException()
-                                    .flatMap(ex -> reactor.core.publisher.Mono.error(
-                                            new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED,
-                                                    "카카오 API 호출 실패")
-                                    )))
-                    .bodyToMono(Map.class) // map class 타입 변환
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, res -> res.createException()
+                            .flatMap(ex -> reactor.core.publisher.Mono.error(
+                                    new BusinessException(ErrorCode.AUTH_INVALID_ID_TOKEN,
+                                            "카카오 accessToken 검증 실패"))))
+                    .onStatus(HttpStatusCode::is5xxServerError, res -> res.createException()
+                            .flatMap(ex -> reactor.core.publisher.Mono.error(
+                                    new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED,
+                                            "카카오 user/me 호출 실패"))))
+                    .bodyToMono(Map.class)
                     .block();
 
             if (body == null || body.get("id") == null) {
@@ -68,16 +116,12 @@ public class KakaoOAuthClient implements OAuthClient {
             Map<String, Object> profile = (Map<String, Object>) kakaoAccount.getOrDefault("profile", Map.of());
 
             String email = (String) kakaoAccount.get("email");
-            String nickname = Optional.ofNullable((String) kakaoAccount.get("nickname")).orElse("kakao_" + providerUserId);
+            String nickname = Optional.ofNullable((String) profile.get("nickname"))
+                    .orElse("kakao_" + providerUserId);
 
-            // response
             return new OAuthUserInfo(SocialProvider.KAKAO, providerUserId, email, nickname);
 
-        } catch (BusinessException e){
-            throw e;
         } catch (WebClientException e) {
-            throw new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED, "카카오 API 호출 실패");
-        } catch (Exception e) {
             throw new BusinessException(ErrorCode.AUTH_KAKAO_API_FAILED, "카카오 API 네트워크 오류");
         }
     }
