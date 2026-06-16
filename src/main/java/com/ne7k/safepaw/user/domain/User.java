@@ -71,4 +71,7 @@ public class User extends BaseTimeEntity {
         this.lastLoginAt = OffsetDateTime.now();
     }
 
+    // nickname update
+    public void updateNickname(String nickname) { this.nickname = nickname; }
+
 }
