@@ -7,7 +7,7 @@ import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.user.domain.User;
 import com.ne7k.safepaw.user.dto.response.MeDogSummary;
 import com.ne7k.safepaw.user.dto.response.MeResponse;
-import com.ne7k.safepaw.user.repsitory.UserRepository;
+import com.ne7k.safepaw.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -11,7 +11,7 @@ import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.global.storage.MinioStorageClient;
 import com.ne7k.safepaw.global.storage.StorageProperties;
 import com.ne7k.safepaw.user.domain.User;
-import com.ne7k.safepaw.user.repsitory.UserRepository;
+import com.ne7k.safepaw.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

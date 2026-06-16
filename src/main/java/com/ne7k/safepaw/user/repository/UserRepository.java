@@ -1,4 +1,4 @@
-package com.ne7k.safepaw.user.repsitory;
+package com.ne7k.safepaw.user.repository;
 
 import com.ne7k.safepaw.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -14,7 +14,7 @@ import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.global.security.JwtTokenProvider;
 import com.ne7k.safepaw.user.domain.User;
-import com.ne7k.safepaw.user.repsitory.UserRepository;
+import com.ne7k.safepaw.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
