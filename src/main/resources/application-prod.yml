@@ -20,6 +20,7 @@ spring:
 
 server:
   port: 8080
+  forward-headers-strategy: framework # swagger https
 
 management:
   endpoints:
@@ -46,11 +47,14 @@ safepaw:
     provider: minio
     region: us-east-1
     endpoint: http://127.0.0.1:9000
-    public-endpoint: http://168.107.2.91:9000
+    public-endpoint: ${SAFEPAW_STORAGE_PUBLIC_URL}
     access-key: ${MINIO_ROOT_USER}
     secret-key: ${MINIO_ROOT_PASSWORD}
     path-style-access: true
     bucket-markers: dog-markers
     bucket-share-cards: share-cards
     bucket-presets: presets
-    public-base-url: http://168.107.2.91:9000
+    public-base-url: ${SAFEPAW_STORAGE_PUBLIC_URL}
+
+  dog:
+    max-per-user: 5

@@ -3,6 +3,7 @@ package com.ne7k.safepaw.auth.service;
 import com.ne7k.safepaw.auth.domain.RefreshToken;
 import com.ne7k.safepaw.auth.dto.response.AuthUserResponse;
 import com.ne7k.safepaw.auth.repository.RefreshTokenRepository;
+import com.ne7k.safepaw.dog.service.DogSetupRequiredChecker;
 import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.global.security.JwtTokenProvider;
@@ -22,6 +23,7 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final DogSetupRequiredChecker dogSetupRequiredChecker;
 
     // 새 토큰 발급, db에는 hash 저장, client 평문 토큰 전송
     public String issueAndStore(User user, String userAgent) {
@@ -77,7 +79,7 @@ public class RefreshTokenService {
         refreshTokenRepository.save(newRow);
         row.replaceWith(newRow.getId(), now); // insert
 
-        AuthUserResponse userResponse = AuthUserResponse.of(user, true);
+        AuthUserResponse userResponse = AuthUserResponse.of(user, dogSetupRequiredChecker.isRequired(userId));
         return new RotateResult(newAccessToken, newRefreshToken, userResponse);
     }
 

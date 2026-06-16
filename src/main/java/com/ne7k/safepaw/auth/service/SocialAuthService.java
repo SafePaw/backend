@@ -9,6 +9,7 @@ import com.ne7k.safepaw.auth.repository.SocialIdentityRepository;
 import com.ne7k.safepaw.auth.service.oauth.OAuthClient;
 import com.ne7k.safepaw.auth.service.oauth.OAuthClientResolver;
 import com.ne7k.safepaw.auth.service.oauth.OAuthUserInfo;
+import com.ne7k.safepaw.dog.service.DogSetupRequiredChecker;
 import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.global.security.JwtTokenProvider;
@@ -31,6 +32,7 @@ public class SocialAuthService {
     private final SocialIdentityRepository socialIdentityRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
+    private final DogSetupRequiredChecker dogSetupRequiredChecker;
 
     // 토큰 검증 및 초기 설정
     public AuthTokenResponse loginOrSignup(SocialLoginRequest req, String userAgent) {
@@ -59,7 +61,7 @@ public class SocialAuthService {
         String accessToken = jwtTokenProvider.issueAccessToken(user.getId());
         String refreshToken = refreshTokenService.issueAndStore(user, userAgent);
 
-        boolean dogSetupRequired = true; // set3.md에서 수정할 예정임
+        boolean dogSetupRequired = dogSetupRequiredChecker.isRequired(user.getId());
 
         return new AuthTokenResponse( // response dto
                 accessToken,

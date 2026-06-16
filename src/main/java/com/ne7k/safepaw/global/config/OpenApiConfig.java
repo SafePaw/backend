@@ -7,12 +7,18 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import io.swagger.v3.oas.models.servers.Server;
+import java.util.List;
+
 @Configuration
 public class OpenApiConfig {
 
     @Bean
     public OpenAPI customopenAPI() {
         return new OpenAPI()
+                .servers(List.of(
+                        new Server().url("https://ne7k.cloud").description("Production")
+                ))
                 .info(new Info() // swagger
                         .title("SafePaw API")
                         .description("SafePaw REST API")
