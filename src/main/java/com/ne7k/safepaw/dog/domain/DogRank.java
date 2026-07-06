@@ -10,4 +10,13 @@ public enum DogRank {
     public static DogRank initial() {
         return PUPPY_WALKER;
     }
+
+    public static DogRank ofTotalXp(int totalXp) {
+        if (totalXp >= 5000) return ALPHA_DOG;
+        if (totalXp >= 2000) return TERRITORY_PIONEER;
+        if (totalXp >= 500)  return STREET_STROLLER;
+        if (totalXp >= 100)  return NEIGHBORHOOD_EXPLORER;
+        return PUPPY_WALKER;
+    }
+
 }

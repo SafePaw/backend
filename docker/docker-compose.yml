@@ -68,11 +68,11 @@ services:
       --appendonly yes
       --appendfsync everysec
       --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
     #   appendonly yes        — 디스크에 로그 저장 (재시작 후 데이터 유지)
     #   appendfsync everysec  — 1초마다 디스크 동기화
     #   maxmemory 512mb       — 최대 메모리 (VM 24GB 중 Redis 상한)
-    #   maxmemory-policy      — 메모리 꽉 차면 오래된 키부터 삭제
+    #   maxmemory-policy      — set4: GPS 버퍼 LRU 삭제 방지 → noeviction
     ports:
       - "127.0.0.1:6379:6379"
     volumes:

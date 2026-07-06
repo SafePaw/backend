@@ -3,7 +3,7 @@ spring:
   application:
     name: safepaw-api
   profiles:
-    active: local
+    active: prod
 
 # api root
 server:

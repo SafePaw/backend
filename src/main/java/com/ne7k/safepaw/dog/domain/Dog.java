@@ -90,6 +90,14 @@ public class Dog extends BaseTimeEntity {
         if (territoryColor != null) this.territoryColor = territoryColor;
     }
 
+    /** XP 누적. Service가 promote()를 별도 호출 */
+    public void gainXp(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("amount must be non-negative");
+        this.totalXp += amount;
+    }
+    public void promote(DogRank newRank) {
+        this.rank = newRank;
+    }
     // 소유권 검사
     public boolean isOwnedBy(Long userId) {
         return owner.getId().equals(userId);

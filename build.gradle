@@ -26,6 +26,9 @@ dependencies {
 	// Minio s3
 	implementation 'software.amazon.awssdk:s3:2.29.45'
 
+	// redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
 	// 입력값 검증
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -47,7 +50,6 @@ dependencies {
 
 	// 서버 상태 모니터링
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
