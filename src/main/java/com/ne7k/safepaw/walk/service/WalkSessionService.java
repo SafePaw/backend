@@ -72,7 +72,7 @@ public class WalkSessionService {
     public WalkFinishResponse finish(Long userId, Long walkId, List<WalkPointDto> lastPoints) {
         WalkSession session = walkSessionRepository.findByIdAndDog_Owner_Id(walkId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WALK_NOT_FOUND));
-        if (!session.isOngoing()) {
+        if (!session.isActive()) {
             throw new BusinessException(ErrorCode.WALK_ALREADY_FINISHED);
         }
 

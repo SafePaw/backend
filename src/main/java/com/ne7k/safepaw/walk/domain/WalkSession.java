@@ -62,6 +62,10 @@ public class WalkSession {
 
     // 산책 완료
     public void complete(double distanceMeters, int durationSeconds, int pointCount) {
+        // 강제 재개
+        if (status == WalkStatus.PAUSED) {
+            this.status = WalkStatus.ONGOING;
+        }
         // status ongoing일 때에만 finish 가능하게
         if (status != WalkStatus.ONGOING) {
             throw new BusinessException(ErrorCode.WALK_ALREADY_FINISHED);
@@ -73,9 +77,25 @@ public class WalkSession {
         this.pointCount = pointCount;
     }
 
-    // 중도 포기
+    // 산책 중지
+    public void pause() {
+        if (status != WalkStatus.ONGOING) {
+            throw new BusinessException(ErrorCode.WALK_NOT_ONGOING);
+        }
+        this.status = WalkStatus.PAUSED;
+    }
+
+    // 산책 재개
+    public void resume() {
+        if (status != WalkStatus.PAUSED) {
+            throw new BusinessException(ErrorCode.WALK_NOT_PAUSED);
+        }
+        this.status = WalkStatus.ONGOING;
+    }
+
+    // 산책 포기 - ongoing, paused 상태일 때에도 포기할 수 있게
     public void abort() {
-        if (status != WalkStatus.ONGOING) return;
+        if (status != WalkStatus.ONGOING && status != WalkStatus.PAUSED) return;
         this.status = WalkStatus.ABORTED;
         this.endedAt = OffsetDateTime.now();
     }
@@ -85,4 +105,7 @@ public class WalkSession {
 
     // 상태 확인
     public boolean isOngoing() { return status == WalkStatus.ONGOING; }
+    public boolean isPaused() { return status == WalkStatus.PAUSED; }
+    public boolean isActive() { return status == WalkStatus.ONGOING || status == WalkStatus.PAUSED; }
+
 }

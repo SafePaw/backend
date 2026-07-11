@@ -23,6 +23,8 @@ public class WalkController {
 
     private final WalkSessionService walkSessionService;
     private final WalkPointAppendService appendService;
+    private final WalkLiveService walkLiveService;
+    private final WalkPauseService walkPauseService;
 
     @PostMapping
     @Operation(summary = "산책 시작", security = @SecurityRequirement(name = "bearerAuth"))
@@ -69,5 +71,29 @@ public class WalkController {
             @AuthenticationPrincipal CustomUserDetails principal,
             @PathVariable Long walkId) {
         return ApiResponse.ok(walkSessionService.detail(principal.getUserId(), walkId));
+    }
+
+    @GetMapping("/{walkId}/live")
+    @Operation(summary = "산책 실시간 통계", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<WalkLiveResponse> live(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId) {
+        return ApiResponse.ok(walkLiveService.live(principal.getUserId(), walkId));
+    }
+
+    @PostMapping("/{walkId}/pause")
+    @Operation(summary = "산책 일시정지", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<WalkPauseResponse> pause(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId) {
+        return ApiResponse.ok(walkPauseService.pause(principal.getUserId(), walkId));
+    }
+
+    @PostMapping("/{walkId}/resume")
+    @Operation(summary = "산책 재개", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<WalkResumeResponse> resume(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId) {
+        return ApiResponse.ok(walkPauseService.resume(principal.getUserId(), walkId));
     }
 }
