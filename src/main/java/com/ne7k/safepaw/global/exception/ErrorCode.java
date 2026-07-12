@@ -43,6 +43,8 @@ public enum ErrorCode {
     WALK_TOO_SHORT            (HttpStatus.UNPROCESSABLE_ENTITY, "산책 시간이 5분 미만입니다."),
     WALK_ONGOING_EXISTS       (HttpStatus.CONFLICT,           "이미 진행 중인 산책이 있습니다."),
     WALK_INVALID_POINT_BATCH  (HttpStatus.UNPROCESSABLE_ENTITY, "GPS 배치 형식이 올바르지 않습니다."),
+    WALK_ALREADY_PAUSED   (HttpStatus.CONFLICT,                 "이미 일시정지 중인 산책입니다."),
+    WALK_NOT_PAUSED       (HttpStatus.CONFLICT,                 "일시정지 상태가 아닙니다."),
 
     // -------- 영토 (TERRITORY_*) --------
     TERRITORY_NOT_FOUND       (HttpStatus.NOT_FOUND,          "영토를 찾을 수 없습니다."),

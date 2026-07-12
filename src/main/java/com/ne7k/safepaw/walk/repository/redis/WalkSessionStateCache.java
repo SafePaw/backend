@@ -27,6 +27,7 @@ public class WalkSessionStateCache {
         h.put("startedAt", startedAt.toString());
         h.put("pointCount", "0");
         h.put("totalMeters", "0");
+        h.put("totalPausedSeconds", "0");
         redis.opsForHash().putAll(key(walkId), h);
         redis.expire(key(walkId), TTL);
     }
@@ -37,17 +38,68 @@ public class WalkSessionStateCache {
         return WalkState.from(h);
     }
 
-    /** 배치 검증 후: 마지막 포인트 + 누적 거리/개수 갱신 */
-    public void updateAfterBatch(long walkId, RedisWalkPoint last, double addedMeters, int addedCount) {
+    /** 배치 검증 후: prev ← last, last ← 새 포인트, bbox 갱신 */
+    public void updateAfterBatch(long walkId, RedisWalkPoint newLast,
+                                 double addedMeters, int addedCount) {
         String k = key(walkId);
-        redis.opsForHash().put(k, "lastLng", String.valueOf(last.lng()));
-        redis.opsForHash().put(k, "lastLat", String.valueOf(last.lat()));
-        redis.opsForHash().put(k, "lastAt", last.recordedAt().toString());
+        Map<Object, Object> current = redis.opsForHash().entries(k);
+
+        // prev ← 기존 last
+        if (current.get("lastLng") != null) {
+            redis.opsForHash().put(k, "prevLng", (String) current.get("lastLng"));
+            redis.opsForHash().put(k, "prevLat", (String) current.get("lastLat"));
+            redis.opsForHash().put(k, "prevAt",  (String) current.get("lastAt"));
+        }
+
+        // last ← 새 포인트
+        redis.opsForHash().put(k, "lastLng", String.valueOf(newLast.lng()));
+        redis.opsForHash().put(k, "lastLat", String.valueOf(newLast.lat()));
+        redis.opsForHash().put(k, "lastAt",  newLast.recordedAt().toString());
+
+        // 누적 거리 · 개수
         redis.opsForHash().increment(k, "pointCount", addedCount);
-        // increment 는 정수 전용 → 미터는 putAll 로 재기록
-        double newTotal = Double.parseDouble(String.valueOf(redis.opsForHash().get(k, "totalMeters"))) + addedMeters;
-        redis.opsForHash().put(k, "totalMeters", String.valueOf(newTotal));
+        double oldTotal = parseDoubleOr(current, "totalMeters", 0.0);
+        redis.opsForHash().put(k, "totalMeters", String.valueOf(oldTotal + addedMeters));
+
+        // bbox 갱신
+        updateBbox(k, current, newLast.lng(), newLast.lat());
+    }
+
+    private void updateBbox(String k, Map<Object, Object> current, double lng, double lat) {
+        double minLng = parseDoubleOr(current, "minLng", lng);
+        double maxLng = parseDoubleOr(current, "maxLng", lng);
+        double minLat = parseDoubleOr(current, "minLat", lat);
+        double maxLat = parseDoubleOr(current, "maxLat", lat);
+
+        redis.opsForHash().put(k, "minLng", String.valueOf(Math.min(minLng, lng)));
+        redis.opsForHash().put(k, "maxLng", String.valueOf(Math.max(maxLng, lng)));
+        redis.opsForHash().put(k, "minLat", String.valueOf(Math.min(minLat, lat)));
+        redis.opsForHash().put(k, "maxLat", String.valueOf(Math.max(maxLat, lat)));
+    }
+
+    /** 일시정지: pausedAt 저장 */
+    public void markPaused(long walkId) {
+        redis.opsForHash().put(key(walkId), "pausedAt", OffsetDateTime.now().toString());
+    }
+
+    /** 재개: pausedAt → totalPausedSeconds 누적 후 삭제 */
+    public void markResumed(long walkId) {
+        String k = key(walkId);
+        Map<Object, Object> h = redis.opsForHash().entries(k);
+        String pausedAtStr = (String) h.get("pausedAt");
+        if (pausedAtStr != null) {
+            OffsetDateTime pausedAt = OffsetDateTime.parse(pausedAtStr);
+            long elapsed = java.time.Duration.between(pausedAt, OffsetDateTime.now()).getSeconds();
+            long accumulated = Long.parseLong((String) h.getOrDefault("totalPausedSeconds", "0"));
+            redis.opsForHash().put(k, "totalPausedSeconds", String.valueOf(accumulated + elapsed));
+            redis.opsForHash().delete(k, "pausedAt");
+        }
     }
 
     public void evict(long walkId) { redis.delete(key(walkId)); }
+
+    private double parseDoubleOr(Map<Object, Object> h, String key, double defaultVal) {
+        Object v = h.get(key);
+        return v == null ? defaultVal : Double.parseDouble((String) v);
+    }
 }

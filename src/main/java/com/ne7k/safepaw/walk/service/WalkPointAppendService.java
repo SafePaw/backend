@@ -32,6 +32,10 @@ public class WalkPointAppendService {
             throw new BusinessException(ErrorCode.WALK_NOT_ONGOING);
         }
 
+        if (state.isPaused()) {
+            throw new BusinessException(ErrorCode.WALK_NOT_ONGOING);
+        }
+
         List<RedisWalkPoint> batch = points.stream()
                 .map(p -> new RedisWalkPoint(p.lng(), p.lat(), p.accuracyMeters(), p.speedKmh(), p.recordedAt()))
                 .toList();

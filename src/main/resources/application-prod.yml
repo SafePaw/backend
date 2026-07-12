@@ -31,6 +31,7 @@ management:
 
 safepaw:
   walk:
+    calorie-coefficient: 1.1       # 강아지 칼로리 계수
     gps:
       max-accuracy-meters: 30      # 이보다 부정확하면 포인트 폐기
       min-speed-kmh: 1.0           # 정지로 간주
