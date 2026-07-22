@@ -1,5 +1,4 @@
 package com.ne7k.safepaw.walk.controller;
-
 import com.ne7k.safepaw.global.response.ApiResponse;
 import com.ne7k.safepaw.global.security.CustomUserDetails;
 import com.ne7k.safepaw.walk.dto.request.*;
@@ -33,6 +32,15 @@ public class WalkController {
             @Valid @RequestBody WalkStartRequest req) {
         WalkStartResponse body = walkSessionService.start(principal.getUserId(), req.dogId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(body));
+    }
+
+    /** set7: 활성 산책 복구용 — /{walkId} 보다 위에 둘 것 */
+    @GetMapping("/active")
+    @Operation(summary = "내 활성 산책 목록 (ONGOING|PAUSED)", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<ActiveWalkListResponse> active(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(required = false) Long dogId) {
+        return ApiResponse.ok(walkSessionService.listActive(principal.getUserId(), dogId));
     }
 
     @PostMapping("/{walkId}/points")
