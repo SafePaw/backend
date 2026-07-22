@@ -80,8 +80,9 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://ne7k.cloud"
-                //"https://safepaw.vercel.app"   // 추후 실제 Vercel URL로 교체
+                "https://ne7k.cloud",
+                "https://safepaw-frontend.vercel.app",
+                "https://frontend-git-feat-09-walktracking-leehaeiins-projects.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

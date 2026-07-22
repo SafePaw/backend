@@ -61,11 +61,27 @@ public class WalkSessionService {
 
     @Transactional
     protected WalkSession persistStart(Dog dog) {
-        // 동일 강아지 ONGOING 중복 방지(락과 이중 안전망)
-        walkSessionRepository.findOngoingByDogId(dog.getId()).ifPresent(w -> {
+        walkSessionRepository.findActiveByDogId(dog.getId()).ifPresent(w -> {
             throw new BusinessException(ErrorCode.WALK_ONGOING_EXISTS);
         });
         return walkSessionRepository.save(WalkSession.start(dog));
+    }
+
+    @Transactional(readOnly = true)
+    public ActiveWalkListResponse listActive(Long userId, Long dogId) {
+        if (dogId != null) {
+            dogRepository.findByIdAndOwner_Id(dogId, userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.DOG_NOT_FOUND));
+        }
+
+        List<WalkSession> sessions = (dogId != null)
+                ? walkSessionRepository.findActiveByOwnerIdAndDogId(userId, dogId)
+                : walkSessionRepository.findActiveByOwnerId(userId);
+
+        List<ActiveWalkResponse> walks = sessions.stream()
+                .map(ActiveWalkResponse::from)
+                .toList();
+        return ActiveWalkListResponse.of(walks);
     }
 
     // ---------- 종료 ----------
@@ -129,4 +145,6 @@ public class WalkSessionService {
                 .orElse(null);
         return WalkDetailResponse.from(s, lngLat, territoryId);
     }
+
+
 }
