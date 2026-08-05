@@ -2,6 +2,7 @@ package com.ne7k.safepaw.walk.repository;
 
 import com.ne7k.safepaw.walk.domain.WalkPoint;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,5 +18,13 @@ public interface WalkPointRepository extends JpaRepository<WalkPoint, Long> {
         ORDER BY wp.recorded_at ASC
         """, nativeQuery = true)
     List<Object[]> findLngLatByWalkSessionId(@Param("walkId") Long walkId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+    delete from WalkPoint p
+    where p.walkSession.id in (
+        select w.id from WalkSession w where w.dog.id = :dogId)
+    """)
+    void deleteAllByDogId(@Param("dogId") Long dogId);
 
 }

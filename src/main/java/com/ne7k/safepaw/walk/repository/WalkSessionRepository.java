@@ -2,11 +2,15 @@ package com.ne7k.safepaw.walk.repository;
 
 import com.ne7k.safepaw.walk.domain.WalkSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+
+import com.ne7k.safepaw.walk.domain.WalkStatus;
+import java.util.Collection;
 
 public interface WalkSessionRepository extends JpaRepository<WalkSession, Long> {
 
@@ -43,4 +47,11 @@ public interface WalkSessionRepository extends JpaRepository<WalkSession, Long> 
     List<WalkSession> findActiveByOwnerIdAndDogId(
             @Param("userId") Long userId,
             @Param("dogId") Long dogId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from WalkSession w where w.dog.id = :dogId")
+    int deleteAllByDogId(@Param("dogId") Long dogId);
+
+    List<WalkSession> findByDog_IdAndStatusIn(Long dogId, Collection<WalkStatus> statuses);
+
 }
