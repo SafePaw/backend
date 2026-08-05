@@ -4,6 +4,7 @@ import com.ne7k.safepaw.walk.domain.WalkSession;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -16,8 +17,7 @@ public interface WalkSessionRepository extends JpaRepository<WalkSession, Long> 
     @Query("""
             select w from WalkSession w
             where w.dog.id = :dogId
-              and w.status in (com.ne7k.safepaw.walk.domain.WalkStatus.ONGOING,
-                               com.ne7k.safepaw.walk.domain.WalkStatus.PAUSED)
+              and w.status in ('ONGOING', 'PAUSED')
             """)
     Optional<WalkSession> findActiveByDogId(@Param("dogId") Long dogId);
 
@@ -26,8 +26,7 @@ public interface WalkSessionRepository extends JpaRepository<WalkSession, Long> 
             select w from WalkSession w
             join fetch w.dog d
             where d.owner.id = :userId
-              and w.status in (com.ne7k.safepaw.walk.domain.WalkStatus.ONGOING,
-                               com.ne7k.safepaw.walk.domain.WalkStatus.PAUSED)
+              and w.status in ('ONGOING', 'PAUSED')
             order by w.startedAt desc
             """)
     List<WalkSession> findActiveByOwnerId(@Param("userId") Long userId);
@@ -38,12 +37,10 @@ public interface WalkSessionRepository extends JpaRepository<WalkSession, Long> 
             join fetch w.dog d
             where d.owner.id = :userId
               and d.id = :dogId
-              and w.status in (com.ne7k.safepaw.walk.domain.WalkStatus.ONGOING,
-                               com.ne7k.safepaw.walk.domain.WalkStatus.PAUSED)
+              and w.status in ('ONGOING', 'PAUSED')
             order by w.startedAt desc
             """)
     List<WalkSession> findActiveByOwnerIdAndDogId(
             @Param("userId") Long userId,
             @Param("dogId") Long dogId);
-
 }

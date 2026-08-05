@@ -42,9 +42,8 @@ public class TerritoryController {
             throw new BusinessException(ErrorCode.TERRITORY_BBOX_TOO_LARGE);
         }
 
-        var list = territoryService.findInBbox(swLng, swLat, neLng, neLat).stream()
-                .map(t -> TerritoryResponse.from(t, principal.getUserId()))
-                .toList();
+        var list = territoryService.findInBbox(
+                swLng, swLat, neLng, neLat, principal.getUserId());
         return ApiResponse.ok(list);
     }
 

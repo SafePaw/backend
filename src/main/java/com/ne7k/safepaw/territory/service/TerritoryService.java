@@ -13,6 +13,7 @@ import com.ne7k.safepaw.walk.repository.redis.RedisWalkPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
 
 import java.util.List;
 import com.ne7k.safepaw.territory.domain.TerritoryStatus;
@@ -102,7 +103,10 @@ public class TerritoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<Territory> findInBbox(double swLng, double swLat, double neLng, double neLat) {
-        return territoryRepository.findActiveInBbox(swLng, swLat, neLng, neLat);
+    public List<TerritoryResponse> findInBbox(
+            double swLng, double swLat, double neLng, double neLat, Long viewerUserId) {
+        return territoryRepository.findActiveInBbox(swLng, swLat, neLng, neLat).stream()
+                .map(t -> TerritoryResponse.from(t, viewerUserId))
+                .toList();
     }
 }
