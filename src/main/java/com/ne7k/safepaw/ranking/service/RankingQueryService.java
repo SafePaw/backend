@@ -60,11 +60,16 @@ public class RankingQueryService {
         List<RankingEntryResponse> content = new ArrayList<>(rows.size());
         for (DogRankRow row : rows) {
             Dog dog = dogs.get(row.getDogId());
+            MarkerUrlResolver.MarkerFields marker = dog != null
+                    ? markerUrlResolver.resolveFields(dog.getMarkerImageKey())
+                    : new MarkerUrlResolver.MarkerFields(null, null, null);
             content.add(new RankingEntryResponse(
                     row.getRank(),
                     row.getDogId(),
                     dog != null ? dog.getName() : "(unknown)",
-                    dog != null ? markerUrlResolver.resolve(dog.getMarkerImageKey()) : null,
+                    marker.url(),
+                    marker.type() != null ? marker.type().name() : null,
+                    marker.value(),
                     dog != null && dog.getRank() != null ? dog.getRank().name() : null,
                     dog != null ? dog.getTerritoryColor() : null,
                     row.getValue() != null ? row.getValue() : 0.0,
@@ -94,6 +99,9 @@ public class RankingQueryService {
             throw new BusinessException(ErrorCode.DOG_NOT_OWNED);
         }
 
+        MarkerUrlResolver.MarkerFields marker =
+                markerUrlResolver.resolveFields(dog.getMarkerImageKey());
+
         DogRankRow xpRow = findRow(seasonStatsRepository.findAllXpRanks(seasonKey), dogId);
         DogRankRow territoryRow = findRow(seasonStatsRepository.findAllTerritoryRanks(seasonKey), dogId);
         DogRankRow distanceRow = findRow(seasonStatsRepository.findAllDistanceRanks(seasonKey), dogId);
@@ -103,6 +111,10 @@ public class RankingQueryService {
                 seasonKey,
                 dog.getId(),
                 dog.getName(),
+                marker.url(),
+                marker.type() != null ? marker.type().name() : null,
+                marker.value(),
+                dog.getTerritoryColor(),
                 new MyRankingResponse.CategoryRanks(
                         toSlice(xpRow,
                                 seasonStatsRepository.countXpParticipants(seasonKey),
@@ -137,7 +149,6 @@ public class RankingQueryService {
         }
         Double percentile = null;
         if (participants > 0) {
-            // (나보다 value 큰 수 / 시즌 참가 수) * 100 — 소수 1자리
             percentile = Math.round((above * 1000.0 / participants)) / 10.0;
         }
         return new MyRankingResponse.RankSlice(

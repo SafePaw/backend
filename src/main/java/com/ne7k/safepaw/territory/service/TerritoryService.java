@@ -1,27 +1,28 @@
 package com.ne7k.safepaw.territory.service;
 
 import com.ne7k.safepaw.dog.domain.Dog;
+import com.ne7k.safepaw.dog.repository.DogRepository;
+import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
+import com.ne7k.safepaw.global.exception.BusinessException;
+import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.score.domain.Season;
 import com.ne7k.safepaw.score.service.SeasonService;
 import com.ne7k.safepaw.score.service.XpService;
 import com.ne7k.safepaw.territory.domain.Territory;
+import com.ne7k.safepaw.territory.domain.TerritoryStatus;
+import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
-import com.ne7k.safepaw.walk.domain.*;
+import com.ne7k.safepaw.walk.domain.WalkPoint;
+import com.ne7k.safepaw.walk.domain.WalkSession;
 import com.ne7k.safepaw.walk.dto.response.WalkFinishResponse;
 import com.ne7k.safepaw.walk.repository.WalkPointRepository;
+import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
 import com.ne7k.safepaw.walk.repository.redis.RedisWalkPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
 
 import java.util.List;
-import com.ne7k.safepaw.territory.domain.TerritoryStatus;
-import com.ne7k.safepaw.global.exception.BusinessException;
-import com.ne7k.safepaw.global.exception.ErrorCode;
-
-import com.ne7k.safepaw.dog.repository.DogRepository;
-import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class TerritoryService {
     private final PartialConquestService partialConquest;
     private final SeasonService seasonService;
     private final XpService xpService;
+    private final MarkerUrlResolver markerUrlResolver;
 
     /**
      * 한 트랜잭션: 포인트 bulk INSERT → 세션 완료 → 영토 자격 판정 →
@@ -103,10 +105,21 @@ public class TerritoryService {
     }
 
     @Transactional(readOnly = true)
+    public TerritoryResponse getDetail(Long territoryId, Long viewerUserId) {
+        return toResponse(findById(territoryId), viewerUserId);
+    }
+
+    @Transactional(readOnly = true)
     public List<TerritoryResponse> findInBbox(
             double swLng, double swLat, double neLng, double neLat, Long viewerUserId) {
         return territoryRepository.findActiveInBbox(swLng, swLat, neLng, neLat).stream()
-                .map(t -> TerritoryResponse.from(t, viewerUserId))
+                .map(t -> toResponse(t, viewerUserId))
                 .toList();
+    }
+
+    /** bbox · 상세 · (컨트롤러에서) 내 영토 매핑 공용 */
+    public TerritoryResponse toResponse(Territory t, Long viewerUserId) {
+        var marker = markerUrlResolver.resolveFields(t.getDog().getMarkerImageKey());
+        return TerritoryResponse.from(t, viewerUserId, marker);
     }
 }

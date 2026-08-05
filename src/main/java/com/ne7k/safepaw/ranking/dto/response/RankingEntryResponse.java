@@ -5,6 +5,8 @@ public record RankingEntryResponse(
         Long dogId,
         String dogName,
         String markerImageUrl,
+        String markerImageType,
+        String markerImageValue,
         String rankBadge,
         String territoryColor,
         double value,

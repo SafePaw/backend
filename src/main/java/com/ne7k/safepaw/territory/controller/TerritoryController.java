@@ -17,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import com.ne7k.safepaw.territory.domain.Territory;
-
 @Tag(name = "Territories")
 @RestController
 @RequestMapping("/api/v1/territories")
@@ -35,7 +33,6 @@ public class TerritoryController {
             @RequestParam double swLng, @RequestParam double swLat,
             @RequestParam double neLng, @RequestParam double neLat) {
 
-        // bbox 면적 가드 (대각선 두 변 곱 근사)
         double widthM = GeoUtils.haversineMeters(swLng, swLat, neLng, swLat);
         double heightM = GeoUtils.haversineMeters(swLng, swLat, swLng, neLat);
         if (widthM * heightM > props.bboxMaxAreaSquareMeters()) {
@@ -52,7 +49,7 @@ public class TerritoryController {
     public ApiResponse<TerritoryResponse> detail(
             @AuthenticationPrincipal CustomUserDetails principal,
             @PathVariable Long territoryId) {
-        Territory territory = territoryService.findById(territoryId);
-        return ApiResponse.ok(TerritoryResponse.from(territory, principal.getUserId()));
+        return ApiResponse.ok(
+                territoryService.getDetail(territoryId, principal.getUserId()));
     }
 }
