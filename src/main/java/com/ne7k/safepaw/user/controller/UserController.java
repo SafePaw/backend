@@ -2,6 +2,7 @@ package com.ne7k.safepaw.user.controller;
 
 import com.ne7k.safepaw.global.response.ApiResponse;
 import com.ne7k.safepaw.global.security.CustomUserDetails;
+import com.ne7k.safepaw.territory.service.TerritoryService;
 import com.ne7k.safepaw.user.dto.request.UserUpdateRequest;
 import com.ne7k.safepaw.user.dto.response.MeResponse;
 import com.ne7k.safepaw.user.service.UserQueryService;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserController {
 
     private final TerritoryRepository territoryRepository;
+    private final TerritoryService territoryService;
     private final UserQueryService userQueryService;
 
     @GetMapping
@@ -70,7 +72,7 @@ public class UserController {
                 : territoryRepository.findByDog_Owner_IdAndStatus(userId, ts, pageable);
 
         return ApiResponse.ok(
-                PageResponse.from(result.map(t -> TerritoryResponse.from(t, userId)))
+                PageResponse.from(result.map(t -> territoryService.toResponse(t, userId)))
         );
     }
 }

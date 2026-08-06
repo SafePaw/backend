@@ -4,6 +4,7 @@ import com.ne7k.safepaw.dog.domain.Dog;
 import com.ne7k.safepaw.dog.domain.DogRank;
 import com.ne7k.safepaw.dog.domain.Gender;
 import com.ne7k.safepaw.dog.domain.MarkerImageType;
+import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
 import com.ne7k.safepaw.global.storage.MinioStorageClient;
 import com.ne7k.safepaw.global.storage.StorageProperties;
 
@@ -22,9 +23,18 @@ public record DogResponse(
         int totalXp
 ) {
 
+    /** 기존 시그니처 유지 — DogService 호출부 변경 최소화 */
     public static DogResponse from(Dog dog, MinioStorageClient storage, StorageProperties props) {
-        String key = dog.getMarkerImageKey();
-        MarkerFields marker = resolveMarkerFields(key, storage, props);
+        MarkerUrlResolver.MarkerFields marker =
+                new MarkerUrlResolver(storage, props).resolveFields(dog.getMarkerImageKey());
+        return of(dog, marker);
+    }
+
+    public static DogResponse from(Dog dog, MarkerUrlResolver resolver) {
+        return of(dog, resolver.resolveFields(dog.getMarkerImageKey()));
+    }
+
+    private static DogResponse of(Dog dog, MarkerUrlResolver.MarkerFields marker) {
         return new DogResponse(
                 dog.getId(),
                 dog.getName(),
@@ -39,26 +49,5 @@ public record DogResponse(
                 dog.getRank(),
                 dog.getTotalXp()
         );
-    }
-
-    private record MarkerFields(MarkerImageType type, String value, String url) {}
-
-    private static MarkerFields resolveMarkerFields(String markerKey,
-                                                    MinioStorageClient storage,
-                                                    StorageProperties props) {
-        if (markerKey == null || markerKey.isBlank()) {
-            return new MarkerFields(null, null, null);
-        }
-        if (markerKey.startsWith("presets/")) {
-            String presetCode = markerKey
-                    .replace("presets/markers/", "")
-                    .replaceAll("\\.png$", "");
-            String url = storage.publicUrl(
-                    props.bucketPresets(),
-                    markerKey.substring("presets/".length()));
-            return new MarkerFields(MarkerImageType.PRESET, presetCode, url);
-        }
-        String url = storage.publicUrl(props.bucketMarkers(), markerKey);
-        return new MarkerFields(MarkerImageType.UPLOADED, markerKey, url);
     }
 }
