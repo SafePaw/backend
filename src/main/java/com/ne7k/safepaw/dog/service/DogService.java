@@ -12,10 +12,21 @@ import com.ne7k.safepaw.global.storage.MinioStorageClient;
 import com.ne7k.safepaw.global.storage.StorageProperties;
 import com.ne7k.safepaw.user.domain.User;
 import com.ne7k.safepaw.user.repository.UserRepository;
+import com.ne7k.safepaw.walk.domain.WalkSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.ne7k.safepaw.score.repository.XpLedgerRepository;
+import com.ne7k.safepaw.territory.repository.TerritoryIntrusionRepository;
+import com.ne7k.safepaw.territory.repository.TerritoryRepository;
+import com.ne7k.safepaw.walk.domain.WalkStatus;
+import com.ne7k.safepaw.walk.repository.WalkPointRepository;
+import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
+import com.ne7k.safepaw.walk.repository.redis.WalkLockManager;
+import com.ne7k.safepaw.walk.repository.redis.WalkPointRedisBuffer;
+import com.ne7k.safepaw.walk.repository.redis.WalkSessionStateCache;
 
 import java.util.List;
 
@@ -32,6 +43,15 @@ public class DogService {
     private final UserRepository userRepository;
     private final MinioStorageClient storage;
     private final StorageProperties storageProperties;
+
+    private final WalkSessionRepository walkSessionRepository;
+    private final WalkPointRepository walkPointRepository;
+    private final TerritoryRepository territoryRepository;
+    private final TerritoryIntrusionRepository territoryIntrusionRepository;
+    private final XpLedgerRepository xpLedgerRepository;
+    private final WalkPointRedisBuffer buffer;
+    private final WalkSessionStateCache stateCache;
+    private final WalkLockManager lockManager;
 
     @Transactional(readOnly = true)
     public List<DogResponse> listMine(Long userId) {
@@ -87,10 +107,31 @@ public class DogService {
     public void delete(Long userId, Long dogId) {
         Dog dog = dogRepository.findById(dogId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOG_NOT_FOUND));
-
-        if(!dog.isOwnedBy(userId)) {
+        if (!dog.isOwnedBy(userId)) {
             throw new BusinessException(ErrorCode.DOG_NOT_OWNED);
         }
+
+        // 1) 활성 산책 Redis 정리 (있을 때만)
+        List<WalkSession> actives = walkSessionRepository
+                .findByDog_IdAndStatusIn(dogId, List.of(WalkStatus.ONGOING, WalkStatus.PAUSED));
+        for (WalkSession w : actives) {
+            buffer.evict(w.getId());
+            stateCache.evict(w.getId());
+        }
+        if (!actives.isEmpty()) {
+            lockManager.release(userId);
+        }
+
+        // 2) DB 자식부터 삭제
+        xpLedgerRepository.clearWalkSessionRefsByDogId(dogId);
+        xpLedgerRepository.clearTerritoryRefsByDogId(dogId);
+        xpLedgerRepository.deleteByDogId(dogId);
+
+        // 3) 강아지 삭제
+        territoryIntrusionRepository.deleteAllByDogId(dogId);
+        territoryRepository.deleteAllByDogId(dogId);
+        walkPointRepository.deleteAllByDogId(dogId);
+        walkSessionRepository.deleteAllByDogId(dogId);
         dogRepository.delete(dog);
     }
 

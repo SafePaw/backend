@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.List;
 import java.util.Optional;
@@ -107,6 +108,11 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
 
     // 해당 강아지의 첫 영토 여부
     boolean existsByDog_IdAndStatus(Long dogId, TerritoryStatus status);
+
+    // 강아지 제거 시 사용되는 메서드
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from Territory t where t.dog.id = :dogId")
+    int deleteAllByDogId(@Param("dogId") Long dogId);
 
     // native projection
     interface IntrusionRow {
