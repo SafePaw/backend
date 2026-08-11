@@ -14,18 +14,26 @@ import java.util.Optional;
 
 public interface TerritoryRepository extends JpaRepository<Territory, Long> {
 
-    // 산책 포인트들 폴리곤 만들어서 반환
+    /**
+     * set9: ConcaveHull(더 오목) → SimplifyPreserveTopology → MakeValid.
+     * allow_holes=false. POLYGON이 아니면 Builder에서 null 처리.
+     */
     @Query(value = """
         SELECT ST_AsText(
-                 ST_ConcaveHull(ST_Collect(wp.geom), :targetPercent, false)
+                 ST_MakeValid(
+                   ST_SimplifyPreserveTopology(
+                     ST_ConcaveHull(ST_Collect(wp.geom), :targetPercent, false),
+                     :simplifyTolerance
+                   )
+                 )
                )
         FROM walk_points wp
         WHERE wp.walk_session_id = :walkId
         """, nativeQuery = true)
     String buildConcaveHullWkt(@Param("walkId") Long walkId,
-                               @Param("targetPercent") double targetPercent);
+                               @Param("targetPercent") double targetPercent,
+                               @Param("simplifyTolerance") double simplifyTolerance);
 
-    // 시작점 종료지점 거리 - 루프 닫힘 판정
     @Query(value = """
         SELECT ST_DistanceSphere(
                  (SELECT geom FROM walk_points WHERE walk_session_id = :walkId ORDER BY recorded_at ASC  LIMIT 1),
@@ -34,11 +42,9 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
         """, nativeQuery = true)
     Double loopGapMeters(@Param("walkId") Long walkId);
 
-    // 폴리곤 면적
     @Query(value = "SELECT ST_Area(ST_GeomFromText(:wkt, 4326)::geography)", nativeQuery = true)
     double areaSquareMeters(@Param("wkt") String wkt);
 
-    // 최소 폭 검증
     @Query(value = """
         SELECT ST_IsEmpty(
                  ST_Buffer(ST_GeomFromText(:wkt, 4326)::geography, -:halfWidthMeters)::geometry
@@ -47,7 +53,6 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     boolean isNarrowerThan(@Param("wkt") String wkt,
                            @Param("halfWidthMeters") double halfWidthMeters);
 
-    // box 내부의 active 영토
     @Query(value = """
         SELECT * FROM territories t
         WHERE t.status = 'ACTIVE'
@@ -56,7 +61,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     List<Territory> findActiveInBbox(@Param("swLng") double swLng, @Param("swLat") double swLat,
                                      @Param("neLng") double neLng, @Param("neLat") double neLat);
 
-    // 새 폴리곤과 겹치는 타 강아지의 활성화 영토 + 겹침 비율
+    /** 타 강아지 ACTIVE (최근 점령 우선 Difference 대상). 동일 dog 제외 */
     @Query(value = """
         SELECT t.id AS territory_id,
                ST_Area(ST_Intersection(t.geom, ST_GeomFromText(:wkt, 4326))::geography)
@@ -70,21 +75,18 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     List<IntrusionRow> findIntrusionCandidates(@Param("myDogId") Long myDogId,
                                                @Param("wkt") String wkt);
 
-    // 겹치는 조각
     @Query(value = """
         SELECT ST_AsText(ST_Intersection(t.geom, ST_GeomFromText(:intruderWkt, 4326)))
         FROM territories t WHERE t.id = :victimId
         """, nativeQuery = true)
     String intersectionWkt(@Param("victimId") Long victimId, @Param("intruderWkt") String intruderWkt);
 
-    // 잔여 영토
     @Query(value = """
         SELECT ST_AsText(ST_Difference(t.geom, ST_GeomFromText(:intruderWkt, 4326)))
         FROM territories t WHERE t.id = :victimId
         """, nativeQuery = true)
     String differenceWkt(@Param("victimId") Long victimId, @Param("intruderWkt") String intruderWkt);
 
-    // 24시간 내 동일 강아지의 거의 같은 영역
     @Query(value = """
         SELECT count(*) FROM territories t
         WHERE t.dog_id = :dogId
@@ -95,29 +97,50 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     long countRecentDuplicates(@Param("dogId") Long dogId, @Param("wkt") String wkt,
                                @Param("hours") int hours);
 
-    // 영토 상세 조회
-    Optional<Territory> findById(Long id);   // JpaRepository 기본 제공
+    /** set9: 동일 강아지 · 겹치는 다른 ACTIVE (Union 후보) */
+    @Query(value = """
+        SELECT t.id FROM territories t
+        WHERE t.status = 'ACTIVE'
+          AND t.dog_id = :dogId
+          AND t.id <> :excludeId
+          AND ST_Intersects(t.geom, ST_GeomFromText(:wkt, 4326))
+        """, nativeQuery = true)
+    List<Long> findSameDogOverlapIds(@Param("dogId") Long dogId,
+                                     @Param("excludeId") Long excludeId,
+                                     @Param("wkt") String wkt);
 
-    // 사용자의 강아지 영토 페이지
+    /** set9: id 목록 Union WKT (합집합 — 새 점령 면적 포함해 저장) */
+    @Query(value = """
+        SELECT ST_AsText(
+                 ST_MakeValid(
+                   ST_CollectionExtract(
+                     ST_UnaryUnion(ST_Collect(t.geom)),
+                     3
+                   )
+                 )
+               )
+        FROM territories t
+        WHERE t.id IN (:ids)
+        """, nativeQuery = true)
+    String unionPolygonsWkt(@Param("ids") List<Long> ids);
+
+    Optional<Territory> findById(Long id);
+
     Page<Territory> findByDog_Owner_IdAndStatus(Long userId, TerritoryStatus status, Pageable pageable);
 
-    // dog id 필터
     Page<Territory> findByDog_Owner_IdAndDog_IdAndStatus(Long userId, Long dogId, TerritoryStatus status, Pageable pageable);
 
     Optional<Territory> findByWalkSession_Id(Long walkSessionId);
 
-    // 해당 강아지의 첫 영토 여부
     boolean existsByDog_IdAndStatus(Long dogId, TerritoryStatus status);
 
-    // 강아지 제거 시 사용되는 메서드
+    // 강아지 삭제 cascade (DogService.delete)
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from Territory t where t.dog.id = :dogId")
     int deleteAllByDogId(@Param("dogId") Long dogId);
 
-    // native projection
     interface IntrusionRow {
         Long getTerritoryId();
         double getOverlapRatio();
     }
-
 }

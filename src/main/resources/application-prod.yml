@@ -41,16 +41,17 @@ safepaw:
     batch:
       max-points: 60               # /points 한 번에 허용하는 최대 포인트(5분치)
     session:
-      min-duration-seconds: 300    # 영토 인정 최소 산책 시간
+      min-duration-seconds: 180    # 영토 인정 최소 산책 시간
       lock-ttl-hours: 2            # 단일 산책 락 TTL
       buffer-ttl-hours: 24         # Redis 버퍼/상태 TTL
 
   territory:
     loop-close-meters: 50          # R1 — 시작-종료 거리 임계
-    min-points: 4                  # 폴리곤 최소 포인트
+    min-points: 6                  # 폴리곤 최소 포인트
     min-width-meters: 15           # 최소 폭
     min-area-square-meters: 100    # 최소 면적
-    concave-hull-target-percent: 0.85   # ST_ConcaveHull 자연스러움 (0~1)
+    concave-hull-target-percent: 0.72   # ST_ConcaveHull 자연스러움 (0~1)
+    hull-simplify-tolerance-degrees: 0.000025
     bbox-max-area-square-meters: 50000000  # 조회 bbox 상한(50km²) — 초과 시 TERRITORY_BBOX_TOO_LARGE
     duplicate-window-hours: 24     # 24h 내 동일영역 재신청 차단
 
