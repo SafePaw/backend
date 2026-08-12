@@ -28,10 +28,12 @@ public class PartialConquestService {
     private final WKTReader wktReader = new WKTReader();
 
     /**
-     * @param newTerritory 방금 INSERT 된 침범자 영토 (geom = 산책 루프 P_new)
-     * @param intruderWkt  P_new WKT
+     * 타 dog ACTIVE와 겹치면 기존(피해) geom을 Difference.
+     * 신규 P_new는 유지 → "최근 점령"이 겹침을 가져감.
+     * FCM/intrusion 이벤트는 피해자 owner ≠ 침범자 owner 일 때만.
      */
-    public List<Result> apply(Territory newTerritory, Long myDogId, String intruderWkt) throws Exception {
+    public List<Result> apply(Territory newTerritory, Long myDogId, Long myOwnerId, String intruderWkt)
+            throws Exception {
         List<Result> results = new ArrayList<>();
 
         for (var row : territoryRepository.findIntrusionCandidates(myDogId, intruderWkt)) {
@@ -47,8 +49,13 @@ public class PartialConquestService {
             Geometry overlapGeom = wktReader.read(overlapWkt);
             overlapGeom.setSRID(4326);
 
-            intrusionRepository.save(TerritoryIntrusion.record(
-                    victim, newTerritory, row.getOverlapRatio(), overlapGeom));
+            Long victimOwnerId = victim.getDog().getOwner().getId();
+            boolean crossOwner = !victimOwnerId.equals(myOwnerId);
+
+            if (crossOwner) {
+                intrusionRepository.save(TerritoryIntrusion.record(
+                        victim, newTerritory, row.getOverlapRatio(), overlapGeom));
+            }
 
             Polygon remainder = null;
             double remainderArea = 0;
@@ -75,10 +82,12 @@ public class PartialConquestService {
                 victimStatusAfter = "CONQUERED";
             }
 
-            publisher.publishEvent(new TerritoryIntrusionEvent(
-                    victim.getDog().getOwner().getId(),
-                    victim.getId(), newTerritory.getId(),
-                    newTerritory.getDog().getName(), row.getOverlapRatio()));
+            if (crossOwner) {
+                publisher.publishEvent(new TerritoryIntrusionEvent(
+                        victimOwnerId,
+                        victim.getId(), newTerritory.getId(),
+                        newTerritory.getDog().getName(), row.getOverlapRatio()));
+            }
 
             results.add(new Result(
                     victim.getId(), victim.getDog().getName(), row.getOverlapRatio(),
@@ -93,9 +102,9 @@ public class PartialConquestService {
             Long victimTerritoryId,
             String victimDogName,
             double overlapRatio,
-            Object stolenPolygon,           // GeoJSON
-            Object victimRemainderPolygon,  // null if CONQUERED
+            Object stolenPolygon,
+            Object victimRemainderPolygon,
             double victimRemainderAreaSquareMeters,
-            String victimStatusAfter        // ACTIVE | CONQUERED
+            String victimStatusAfter
     ) {}
 }

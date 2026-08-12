@@ -9,6 +9,7 @@ public record TerritoryProperties(
         double minWidthMeters,
         double minAreaSquareMeters,
         double concaveHullTargetPercent,
+        double hullSimplifyToleranceDegrees,
         double bboxMaxAreaSquareMeters,
         int duplicateWindowHours
 ) {
