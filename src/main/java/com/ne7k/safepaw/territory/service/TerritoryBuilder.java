@@ -20,7 +20,10 @@ public class TerritoryBuilder {
 
     /** walkId 의 포인트들로 concave hull 폴리곤(WKT) 생성. 폴리곤이 아니면 null */
     public String buildHullWkt(Long walkId) {
-        String wkt = territoryRepository.buildConcaveHullWkt(walkId, props.concaveHullTargetPercent());
+        String wkt = territoryRepository.buildConcaveHullWkt(
+                walkId,
+                props.concaveHullTargetPercent(),
+                props.hullSimplifyToleranceDegrees());
         if (wkt == null || !wkt.startsWith("POLYGON")) {
             // 점이 일직선이거나 너무 적으면 LINESTRING/POINT 가 나옴 → 영토 불가
             return null;
