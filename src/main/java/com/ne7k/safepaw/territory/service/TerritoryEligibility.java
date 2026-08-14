@@ -17,23 +17,18 @@ public class TerritoryEligibility {
     private final TerritoryProperties tProps;
     private final WalkProperties wProps;
 
-    /**
-     * 영토 자격 판정.
-     * @return 통과 시 Eligible(폴리곤·면적), 실패 시 Ineligible(사유·메시지)
-     */
     public Outcome evaluate(Long dogId, Long walkId, int durationSeconds, int validPointCount) {
 
-        // ① 최소 시간 (5분)
+        int minMinutes = Math.max(1, wProps.session().minDurationSeconds() / 60);
         if (durationSeconds < wProps.session().minDurationSeconds()) {
             return Outcome.ineligible(ErrorCode.WALK_TOO_SHORT,
-                    "5분 이상 산책해야 영토가 생겨요. (현재 " + (durationSeconds / 60) + "분)");
+                    minMinutes + "분 이상 산책해야 영토가 생겨요. (현재 "
+                            + (durationSeconds / 60) + "분)");
         }
-        // ② 최소 포인트
         if (validPointCount < tProps.minPoints()) {
             return Outcome.ineligible(ErrorCode.TERRITORY_INSUFFICIENT_POINTS,
                     "유효 GPS 포인트가 부족해요.");
         }
-        // ③ 루프 닫힘 (50m) ⭐
         Double loopGap = territoryRepository.loopGapMeters(walkId);
         if (loopGap == null || loopGap > tProps.loopCloseMeters()) {
             double gap = loopGap == null ? -1 : loopGap;
@@ -41,24 +36,20 @@ public class TerritoryEligibility {
                     String.format("시작점과 %.1fm 떨어져 종료됐어요. %.0fm 이내로 돌아오면 영토가 생겨요.",
                             gap, tProps.loopCloseMeters()), gap);
         }
-        // ④ 폴리곤 생성
         String wkt = builder.buildHullWkt(walkId);
         if (wkt == null) {
             return Outcome.ineligible(ErrorCode.TERRITORY_INSUFFICIENT_POINTS,
                     "경로가 면을 이루지 못했어요.", loopGap);
         }
-        // ⑤ 면적
         double area = territoryRepository.areaSquareMeters(wkt);
         if (area < tProps.minAreaSquareMeters()) {
             return Outcome.ineligible(ErrorCode.TERRITORY_TOO_SMALL,
                     String.format("영토가 너무 좁아요. (%.0f㎡)", area), loopGap);
         }
-        // ⑥ 최소 폭 (음수 버퍼가 비면 폭 부족)
         if (territoryRepository.isNarrowerThan(wkt, tProps.minWidthMeters() / 2.0)) {
             return Outcome.ineligible(ErrorCode.TERRITORY_TOO_NARROW,
                     String.format("루프 폭이 %.0fm 미만이에요.", tProps.minWidthMeters()), loopGap);
         }
-        // ⑦ 24h 중복
         if (territoryRepository.countRecentDuplicates(dogId, wkt, tProps.duplicateWindowHours()) > 0) {
             return Outcome.ineligible(ErrorCode.TERRITORY_DUPLICATE,
                     "24시간 내 같은 영역이 이미 인정됐어요.", loopGap);
@@ -68,7 +59,6 @@ public class TerritoryEligibility {
         return Outcome.eligible(polygon, wkt, area, loopGap);
     }
 
-    /** sealed-like 결과 객체 */
     public record Outcome(
             boolean eligible,
             Polygon polygon, String wkt, Double areaSquareMeters,
@@ -80,7 +70,7 @@ public class TerritoryEligibility {
         public static Outcome ineligible(ErrorCode reason, String message) {
             return new Outcome(false, null, null, null, reason, message, null);
         }
-        public static Outcome ineligible(ErrorCode reason, String message, double gap) {
+        public static Outcome ineligible(ErrorCode reason, String message, Double gap) {
             return new Outcome(false, null, null, null, reason, message, gap);
         }
     }

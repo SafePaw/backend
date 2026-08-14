@@ -15,6 +15,10 @@ import java.util.Optional;
 
 public interface TerritoryRepository extends JpaRepository<Territory, Long> {
 
+    /**
+     * set9: ConcaveHull(더 오목) → SimplifyPreserveTopology → MakeValid.
+     * allow_holes=false. POLYGON이 아니면 Builder에서 null 처리.
+     */
     @Query(value = """
         SELECT ST_AsText(
                  ST_MakeValid(
@@ -58,6 +62,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     List<Territory> findActiveInBbox(@Param("swLng") double swLng, @Param("swLat") double swLat,
                                      @Param("neLng") double neLng, @Param("neLat") double neLat);
 
+    /** 타 강아지 ACTIVE (최근 점령 우선 Difference 대상). 동일 dog 제외 */
     @Query(value = """
         SELECT t.id AS territory_id,
                ST_Area(ST_Intersection(t.geom, ST_GeomFromText(:wkt, 4326))::geography)
@@ -93,6 +98,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     long countRecentDuplicates(@Param("dogId") Long dogId, @Param("wkt") String wkt,
                                @Param("hours") int hours);
 
+    /** set9: 동일 강아지 · 겹치는 다른 ACTIVE (Union 후보) */
     @Query(value = """
         SELECT t.id FROM territories t
         WHERE t.status = 'ACTIVE'
@@ -104,6 +110,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
                                      @Param("excludeId") Long excludeId,
                                      @Param("wkt") String wkt);
 
+    /** set9: id 목록 Union WKT (합집합 — 새 점령 면적 포함해 저장) */
     @Query(value = """
         SELECT ST_AsText(
                  ST_MakeValid(
@@ -136,6 +143,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
 
     boolean existsByDog_IdAndStatus(Long dogId, TerritoryStatus status);
 
+    // 강아지 삭제 cascade (DogService.delete)
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from Territory t where t.dog.id = :dogId")
     int deleteAllByDogId(@Param("dogId") Long dogId);

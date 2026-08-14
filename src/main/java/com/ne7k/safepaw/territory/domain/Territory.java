@@ -94,6 +94,18 @@ public class Territory {
         this.areaSquareMeters = remainderAreaSqm;
     }
 
+    public void replaceGeom(Polygon newGeom, double newAreaSquareMeters) {
+        if (status != TerritoryStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 갱신 가능");
+        }
+        if (newAreaSquareMeters <= 0) {
+            throw new IllegalArgumentException("area must be > 0");
+        }
+        this.geom = newGeom;
+        this.geom.setSRID(4326);
+        this.areaSquareMeters = newAreaSquareMeters;
+    }
+
     // 소유권 확인
     public boolean isOwnedBy(Long userId) { return dog.isOwnedBy(userId); }
 }

@@ -9,7 +9,8 @@ public record TerritoryProperties(
         double minWidthMeters,
         double minAreaSquareMeters,
         double concaveHullTargetPercent,
-        double hullSimplifyToleranceDegrees,   // ← 추가
+        double hullSimplifyToleranceDegrees,
         double bboxMaxAreaSquareMeters,
         int duplicateWindowHours
-) {}
+) {
+}

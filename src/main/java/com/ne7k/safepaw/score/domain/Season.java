@@ -14,7 +14,7 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Season {
 
-    // 'YYYY-MM' 숫자 대신 문자열 - 해당 영토가 어느 달 것인지 파악하기 위해서
+    /** 시즌 키 — set9: 'YYYY-Qn' (예: 2026-Q3). length=7 유지 */
     @Id @Column(length = 7)
     private String key;
 
