@@ -83,9 +83,15 @@ public class UserController {
                 ? territoryRepository.findByDog_Owner_IdAndDog_IdAndStatus(userId, dogId, ts, pageable)
                 : territoryRepository.findByDog_Owner_IdAndStatus(userId, ts, pageable);
 
-        return ApiResponse.ok(
-                PageResponse.from(result.map(t -> territoryService.toResponse(t, userId)))
-        );
+        List<TerritoryResponse> content = territoryService.toResponses(result.getContent(), userId);
+        return ApiResponse.ok(new PageResponse<>(
+                content,
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.hasNext()
+        ));
     }
 
     /** set10: 산책 기록 목록 */

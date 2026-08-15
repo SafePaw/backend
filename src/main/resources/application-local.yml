@@ -42,6 +42,10 @@ safepaw:
   dog:
     max-per-user: 5 # 한 사람이 소유할 수 있는 강아지 마릿수
 
+  crew:
+    max-members: 20
+    invite-code-length: 8
+
   storage:
     provider: minio
     region: us-east-1

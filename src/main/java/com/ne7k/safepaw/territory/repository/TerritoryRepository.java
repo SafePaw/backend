@@ -106,6 +106,20 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     List<Territory> findActiveInBbox(@Param("swLng") double swLng, @Param("swLat") double swLat,
                                      @Param("neLng") double neLng, @Param("neLat") double neLat);
 
+    @Query(value = """
+        SELECT t.* FROM territories t
+        JOIN dogs d ON d.id = t.dog_id
+        JOIN crew_members cm ON cm.user_id = d.user_id
+        WHERE cm.crew_id = :crewId
+          AND t.status = 'ACTIVE'
+          AND ST_Intersects(t.geom, ST_MakeEnvelope(:swLng, :swLat, :neLng, :neLat, 4326))
+        """, nativeQuery = true)
+    List<Territory> findActiveInBboxByCrewId(@Param("crewId") Long crewId,
+                                             @Param("swLng") double swLng,
+                                             @Param("swLat") double swLat,
+                                             @Param("neLng") double neLng,
+                                             @Param("neLat") double neLat);
+
     /** 타 강아지 ACTIVE (최근 점령 우선 Difference 대상). 동일 dog 제외 */
     @Query(value = """
         SELECT t.id AS territory_id,
