@@ -5,10 +5,11 @@ import com.ne7k.safepaw.territory.domain.TerritoryStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.jpa.repository.Modifying;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -131,6 +132,14 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
     Page<Territory> findByDog_Owner_IdAndDog_IdAndStatus(Long userId, Long dogId, TerritoryStatus status, Pageable pageable);
 
     Optional<Territory> findByWalkSession_Id(Long walkSessionId);
+
+    /** set10: 산책 기록 목록 — walkSession.id 키 매핑용 (페이지당 소량, fetch join OK) */
+    @Query("""
+            select t from Territory t
+            join fetch t.walkSession ws
+            where ws.id in :walkSessionIds
+            """)
+    List<Territory> findByWalkSession_IdIn(@Param("walkSessionIds") Collection<Long> walkSessionIds);
 
     boolean existsByDog_IdAndStatus(Long dogId, TerritoryStatus status);
 
