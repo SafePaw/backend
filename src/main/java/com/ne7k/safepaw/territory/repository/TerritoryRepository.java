@@ -16,24 +16,68 @@ import java.util.Optional;
 public interface TerritoryRepository extends JpaRepository<Territory, Long> {
 
     /**
-     * set9: ConcaveHull(더 오목) → SimplifyPreserveTopology → MakeValid.
-     * allow_holes=false. POLYGON이 아니면 Builder에서 null 처리.
+     * set11: recorded_at 순 경로 → 닫힌 ring → ST_BuildArea (+ fallback Polygonize).
+     * 반환: MULTIPOLYGON WKT (단일 POLYGON도 ST_Multi). 실패 시 null.
      */
     @Query(value = """
+        WITH pts AS (
+          SELECT ST_MakeLine(geom ORDER BY recorded_at) AS raw_line
+          FROM walk_points
+          WHERE walk_session_id = :walkId
+          HAVING COUNT(*) >= 2
+        ),
+        cleaned AS (
+          SELECT ST_RemoveRepeatedPoints(
+                   ST_SimplifyPreserveTopology(raw_line, :simplifyTolerance)
+                 ) AS line
+          FROM pts
+        ),
+        closed AS (
+          SELECT ST_AddPoint(line, ST_StartPoint(line)) AS ring
+          FROM cleaned
+          WHERE line IS NOT NULL AND ST_NPoints(line) >= 3
+        ),
+        built AS (
+          SELECT ST_MakeValid(
+                   COALESCE(
+                     NULLIF(ST_BuildArea(ring), 'GEOMETRYCOLLECTION EMPTY'::geometry),
+                     ST_CollectionExtract(ST_Polygonize(ST_Node(ring)), 3)
+                   )
+                 ) AS geom
+          FROM closed
+        ),
+        parts AS (
+          SELECT (ST_Dump(geom)).geom AS part
+          FROM built
+          WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)
+        ),
+        filtered AS (
+          SELECT part FROM parts
+          WHERE ST_GeometryType(part) IN ('ST_Polygon', 'ST_MultiPolygon')
+            AND ST_Area(part::geography) >= :minPartAreaSqm
+        ),
+        merged AS (
+          SELECT ST_Union(ST_Collect(part)) AS geom FROM filtered
+        )
         SELECT ST_AsText(
-                 ST_MakeValid(
-                   ST_SimplifyPreserveTopology(
-                     ST_ConcaveHull(ST_Collect(wp.geom), :targetPercent, false),
-                     :simplifyTolerance
+                 ST_ForcePolygonCCW(
+                   ST_Multi(
+                     ST_CollectionExtract(
+                       ST_MakeValid(
+                         ST_SimplifyPreserveTopology(geom, :polygonSimplifyTolerance)
+                       ),
+                       3
+                     )
                    )
                  )
                )
-        FROM walk_points wp
-        WHERE wp.walk_session_id = :walkId
+        FROM merged
+        WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)
         """, nativeQuery = true)
-    String buildConcaveHullWkt(@Param("walkId") Long walkId,
-                               @Param("targetPercent") double targetPercent,
-                               @Param("simplifyTolerance") double simplifyTolerance);
+    String buildWalkAreaWkt(@Param("walkId") Long walkId,
+                            @Param("simplifyTolerance") double simplifyTolerance,
+                            @Param("polygonSimplifyTolerance") double polygonSimplifyTolerance,
+                            @Param("minPartAreaSqm") double minPartAreaSqm);
 
     @Query(value = """
         SELECT ST_DistanceSphere(

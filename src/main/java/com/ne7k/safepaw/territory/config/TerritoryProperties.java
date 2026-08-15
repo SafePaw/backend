@@ -8,8 +8,9 @@ public record TerritoryProperties(
         int minPoints,
         double minWidthMeters,
         double minAreaSquareMeters,
-        double concaveHullTargetPercent,
-        double hullSimplifyToleranceDegrees,
+        double pathSimplifyToleranceDegrees,
+        double polygonSimplifyToleranceDegrees,
+        double minPolygonPartAreaSquareMeters,
         double bboxMaxAreaSquareMeters,
         int duplicateWindowHours
 ) {

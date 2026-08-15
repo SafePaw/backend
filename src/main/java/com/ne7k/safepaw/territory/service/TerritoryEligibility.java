@@ -5,7 +5,7 @@ import com.ne7k.safepaw.territory.config.TerritoryProperties;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
 import com.ne7k.safepaw.walk.config.WalkProperties;
 import lombok.RequiredArgsConstructor;
-import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.MultiPolygon;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -36,11 +36,14 @@ public class TerritoryEligibility {
                     String.format("시작점과 %.1fm 떨어져 종료됐어요. %.0fm 이내로 돌아오면 영토가 생겨요.",
                             gap, tProps.loopCloseMeters()), gap);
         }
-        String wkt = builder.buildHullWkt(walkId);
+
+        // set11: Concave Hull → 순서 BuildArea
+        String wkt = builder.buildWalkAreaWkt(walkId);
         if (wkt == null) {
             return Outcome.ineligible(ErrorCode.TERRITORY_INSUFFICIENT_POINTS,
                     "경로가 면을 이루지 못했어요.", loopGap);
         }
+
         double area = territoryRepository.areaSquareMeters(wkt);
         if (area < tProps.minAreaSquareMeters()) {
             return Outcome.ineligible(ErrorCode.TERRITORY_TOO_SMALL,
@@ -55,16 +58,16 @@ public class TerritoryEligibility {
                     "24시간 내 같은 영역이 이미 인정됐어요.", loopGap);
         }
 
-        Polygon polygon = builder.parse(wkt);
+        MultiPolygon polygon = builder.parseMultiPolygon(wkt);
         return Outcome.eligible(polygon, wkt, area, loopGap);
     }
 
     public record Outcome(
             boolean eligible,
-            Polygon polygon, String wkt, Double areaSquareMeters,
+            MultiPolygon polygon, String wkt, Double areaSquareMeters,
             ErrorCode reason, String message, Double loopGapMeters
     ) {
-        public static Outcome eligible(Polygon p, String wkt, double area, double gap) {
+        public static Outcome eligible(MultiPolygon p, String wkt, double area, double gap) {
             return new Outcome(true, p, wkt, area, null, null, gap);
         }
         public static Outcome ineligible(ErrorCode reason, String message) {

@@ -8,7 +8,7 @@ import java.time.OffsetDateTime;
 public record TerritoryResponse(
         Long id,
         DogPart dog,
-        GeoJsonPolygon polygon,
+        GeoJsonGeometry polygon,
         double areaSquareMeters,
         boolean isMine,
         String status,
@@ -42,7 +42,7 @@ public record TerritoryResponse(
                         marker.type() != null ? marker.type().name() : null,
                         marker.value()
                 ),
-                GeoJsonPolygon.from(t.getGeom()),
+                GeoJsonGeometry.from(t.getGeom()),
                 t.getAreaSquareMeters(),
                 d.isOwnedBy(viewerUserId),
                 t.getStatus().name(),
