@@ -55,3 +55,5 @@ application-secret*.yml
 .env.data
 .env.prod
 docker/.env*
+
+secrets/firebase*.json

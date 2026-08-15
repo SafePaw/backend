@@ -1,5 +1,7 @@
 package com.ne7k.safepaw.notification.listener;
 
+import com.ne7k.safepaw.notification.service.PushNotificationService;
+import com.ne7k.safepaw.notification.service.PushNotificationService.IntrusionPushPayload;
 import com.ne7k.safepaw.territory.event.TerritoryIntrusionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +15,27 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class IntrusionNotificationListener {
 
-    // private final PushNotificationService push;  // FCM — set5 에서 실제 구현
+    private final PushNotificationService push;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIntrusion(TerritoryIntrusionEvent e) {
-        // 커밋 후 비동기. FCM 발송이 도메인 트랜잭션을 롤백시키지 않도록 분리 (02-backend §2.9)
-        log.info("[INTRUSION] victimUser={} victimTerritory={} by dog={} overlap={}",
-                e.victimUserId(), e.victimTerritoryId(), e.intruderDogName(), e.overlapRatio());
-        // push.send(...); // set5
+        log.info("[INTRUSION-FCM] victimUser={} intrusion={} overlap={}% status={}",
+                e.victimUserId(), e.intrusionId(),
+                Math.round(e.overlapRatio() * 100), e.victimStatusAfter());
+
+        push.sendTerritoryIntrusion(new IntrusionPushPayload(
+                e.victimUserId(),
+                e.intrusionId(),
+                e.victimTerritoryId(),
+                e.victimDogId(),
+                e.victimDogName(),
+                e.intruderDogId(),
+                e.intruderDogName(),
+                e.overlapRatio(),
+                e.stolenAreaSquareMeters(),
+                e.remainderAreaSquareMeters(),
+                e.victimStatusAfter()
+        ));
     }
 }

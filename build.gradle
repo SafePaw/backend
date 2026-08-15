@@ -67,6 +67,9 @@ dependencies {
 	// 테스트 — Security 인증 모킹, WireMock 으로 IdP 응답 stub
 	testImplementation 'org.springframework.security:spring-security-test'
 	testImplementation 'org.wiremock:wiremock-standalone:3.9.1'
+
+	// fcm
+	implementation 'com.google.firebase:firebase-admin:9.4.3'
 }
 
 tasks.named('test') {

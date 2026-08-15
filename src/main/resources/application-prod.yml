@@ -30,6 +30,16 @@ management:
         include: health,info
 
 safepaw:
+  fcm:
+    enabled: true
+    credentials-json-base64: ${FIREBASE_CREDENTIALS_JSON_BASE64}
+
+  notification:
+    season-reminder:
+      enabled: true
+      cron: "0 0 9 * * *"
+      zone: Asia/Seoul
+
   walk:
     calorie-coefficient: 1.1       # 강아지 칼로리 계수
     gps:
