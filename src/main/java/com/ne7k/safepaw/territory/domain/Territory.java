@@ -9,7 +9,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.MultiPolygon;
 
 import java.time.OffsetDateTime;
 
@@ -31,47 +31,42 @@ public class Territory {
     @JoinColumn(name = "walk_session_id", nullable = false)
     private WalkSession walkSession;
 
-    @Column(name = "geom", columnDefinition = "geometry(Polygon, 4326)", nullable = false)
-    private Polygon geom;
+    /** set11: 단일 POLYGON도 MULTIPOLYGON 1개로 저장 */
+    @Column(name = "geom", columnDefinition = "geometry(MultiPolygon, 4326)", nullable = false)
+    private MultiPolygon geom;
 
-    // 영토 면적
     @Column(name = "area_square_meters", nullable = false)
     private double areaSquareMeters;
 
-    // 생명 주기
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private TerritoryStatus status;
 
-    // 시즌
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "season_key", nullable = false)
     private Season season;
 
-    // 영토 차지한 시간
     @Column(name = "claimed_at", nullable = false)
     private OffsetDateTime claimedAt;
 
-    // 빼앗긴 시간
     @Column(name = "conquered_at")
     private OffsetDateTime conqueredAt;
 
-    // 신규 영토 생성
     public static Territory claim(Dog dog, WalkSession session, Season season,
-                                  Polygon geom, double areaSquareMeters) {
+                                  MultiPolygon geom, double areaSquareMeters) {
         if (areaSquareMeters <= 0) throw new IllegalArgumentException("area must be > 0");
         Territory t = new Territory();
         t.dog = dog;
         t.walkSession = session;
         t.season = season;
         t.geom = geom;
+        t.geom.setSRID(4326);
         t.areaSquareMeters = areaSquareMeters;
         t.status = TerritoryStatus.ACTIVE;
         t.claimedAt = OffsetDateTime.now();
         return t;
     }
 
-    // 전부 빼앗겼을 때
     public void markConquered() {
         if (status != TerritoryStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 CONQUERED 처리 가능");
@@ -80,8 +75,8 @@ public class Territory {
         this.conqueredAt = OffsetDateTime.now();
     }
 
-    // 부분 점령
-    public void shrinkToRemainder(Polygon remainder, double remainderAreaSqm) {
+    /** set11: Difference 잔여 — Polygon 또는 MultiPolygon */
+    public void shrinkToRemainder(MultiPolygon remainder, double remainderAreaSqm) {
         if (status != TerritoryStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 분할 가능");
         }
@@ -94,7 +89,8 @@ public class Territory {
         this.areaSquareMeters = remainderAreaSqm;
     }
 
-    public void replaceGeom(Polygon newGeom, double newAreaSquareMeters) {
+    /** set9 merge: Union 결과 geom·면적 교체 */
+    public void replaceGeom(MultiPolygon newGeom, double newAreaSquareMeters) {
         if (status != TerritoryStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 갱신 가능");
         }
@@ -106,6 +102,5 @@ public class Territory {
         this.areaSquareMeters = newAreaSquareMeters;
     }
 
-    // 소유권 확인
     public boolean isOwnedBy(Long userId) { return dog.isOwnedBy(userId); }
 }

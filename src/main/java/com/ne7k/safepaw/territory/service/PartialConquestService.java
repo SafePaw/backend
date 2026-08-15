@@ -3,11 +3,14 @@ package com.ne7k.safepaw.territory.service;
 import com.ne7k.safepaw.territory.config.TerritoryProperties;
 import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.domain.TerritoryIntrusion;
+import com.ne7k.safepaw.territory.domain.TerritoryStatus;
+import com.ne7k.safepaw.territory.dto.response.GeoJsonGeometry;
 import com.ne7k.safepaw.territory.event.TerritoryIntrusionEvent;
 import com.ne7k.safepaw.territory.repository.TerritoryIntrusionRepository;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.WKTReader;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,18 +30,13 @@ public class PartialConquestService {
     private final ApplicationEventPublisher publisher;
     private final WKTReader wktReader = new WKTReader();
 
-    /**
-     * 타 dog ACTIVE와 겹치면 기존(피해) geom을 Difference.
-     * 신규 P_new는 유지 → "최근 점령"이 겹침을 가져감.
-     * FCM/intrusion 이벤트는 피해자 owner ≠ 침범자 owner 일 때만.
-     */
     public List<Result> apply(Territory newTerritory, Long myDogId, Long myOwnerId, String intruderWkt)
             throws Exception {
         List<Result> results = new ArrayList<>();
 
         for (var row : territoryRepository.findIntrusionCandidates(myDogId, intruderWkt)) {
             Territory victim = territoryRepository.findById(row.getTerritoryId()).orElse(null);
-            if (victim == null || victim.getStatus() != com.ne7k.safepaw.territory.domain.TerritoryStatus.ACTIVE) {
+            if (victim == null || victim.getStatus() != TerritoryStatus.ACTIVE) {
                 continue;
             }
 
@@ -57,18 +55,29 @@ public class PartialConquestService {
                         victim, newTerritory, row.getOverlapRatio(), overlapGeom));
             }
 
-            Polygon remainder = null;
+            MultiPolygon remainder = null;
             double remainderArea = 0;
             String victimStatusAfter = "ACTIVE";
 
-            if (remainWkt != null && !remainWkt.isBlank() && !remainWkt.equals("POLYGON EMPTY")) {
+            if (remainWkt != null && !remainWkt.isBlank()) {
                 Geometry g = wktReader.read(remainWkt);
                 g.setSRID(4326);
-                if (g instanceof Polygon p && !p.isEmpty()) {
-                    remainderArea = territoryRepository.areaSquareMeters(remainWkt);
-                    if (remainderArea >= territoryProps.minAreaSquareMeters()) {
-                        victim.shrinkToRemainder(p, remainderArea);
-                        remainder = p;
+                if (!g.isEmpty()) {
+                    MultiPolygon remainderMp = null;
+                    if (g instanceof Polygon p) {
+                        remainderMp = TerritoryBuilder.toMultiPolygon(p);
+                    } else if (g instanceof MultiPolygon mp) {
+                        remainderMp = mp;
+                    }
+                    if (remainderMp != null) {
+                        remainderArea = territoryRepository.areaSquareMeters(remainWkt);
+                        if (remainderArea >= territoryProps.minAreaSquareMeters()) {
+                            victim.shrinkToRemainder(remainderMp, remainderArea);
+                            remainder = remainderMp;
+                        } else {
+                            victim.markConquered();
+                            victimStatusAfter = "CONQUERED";
+                        }
                     } else {
                         victim.markConquered();
                         victimStatusAfter = "CONQUERED";
@@ -91,8 +100,8 @@ public class PartialConquestService {
 
             results.add(new Result(
                     victim.getId(), victim.getDog().getName(), row.getOverlapRatio(),
-                    territoryBuilder.toGeoJsonPolygon(overlapGeom),
-                    remainder != null ? territoryBuilder.toGeoJsonPolygon(remainder) : null,
+                    territoryBuilder.toGeoJson(overlapGeom),
+                    remainder != null ? territoryBuilder.toGeoJson(remainder) : null,
                     remainderArea, victimStatusAfter));
         }
         return results;
@@ -102,8 +111,8 @@ public class PartialConquestService {
             Long victimTerritoryId,
             String victimDogName,
             double overlapRatio,
-            Object stolenPolygon,
-            Object victimRemainderPolygon,
+            GeoJsonGeometry stolenPolygon,
+            GeoJsonGeometry victimRemainderPolygon,
             double victimRemainderAreaSquareMeters,
             String victimStatusAfter
     ) {}
