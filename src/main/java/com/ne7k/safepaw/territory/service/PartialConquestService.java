@@ -30,6 +30,10 @@ public class PartialConquestService {
     private final ApplicationEventPublisher publisher;
     private final WKTReader wktReader = new WKTReader();
 
+    /**
+     * 타 dog ACTIVE와 겹치면 기존 geom Difference.
+     * FCM/intrusion row는 피해자 owner ≠ 침범자 owner 일 때만.
+     */
     public List<Result> apply(Territory newTerritory, Long myDogId, Long myOwnerId, String intruderWkt)
             throws Exception {
         List<Result> results = new ArrayList<>();
@@ -42,7 +46,9 @@ public class PartialConquestService {
 
             String overlapWkt = territoryRepository.intersectionWkt(victim.getId(), intruderWkt);
             String remainWkt = territoryRepository.differenceWkt(victim.getId(), intruderWkt);
-            if (overlapWkt == null || overlapWkt.isBlank()) continue;
+            if (overlapWkt == null || overlapWkt.isBlank()) {
+                continue;
+            }
 
             Geometry overlapGeom = wktReader.read(overlapWkt);
             overlapGeom.setSRID(4326);
@@ -50,8 +56,9 @@ public class PartialConquestService {
             Long victimOwnerId = victim.getDog().getOwner().getId();
             boolean crossOwner = !victimOwnerId.equals(myOwnerId);
 
+            TerritoryIntrusion savedIntrusion = null;
             if (crossOwner) {
-                intrusionRepository.save(TerritoryIntrusion.record(
+                savedIntrusion = intrusionRepository.save(TerritoryIntrusion.record(
                         victim, newTerritory, row.getOverlapRatio(), overlapGeom));
             }
 
@@ -91,11 +98,22 @@ public class PartialConquestService {
                 victimStatusAfter = "CONQUERED";
             }
 
-            if (crossOwner) {
+            if (crossOwner && savedIntrusion != null) {
+                double stolenArea = territoryRepository.areaSquareMeters(overlapWkt);
                 publisher.publishEvent(new TerritoryIntrusionEvent(
                         victimOwnerId,
-                        victim.getId(), newTerritory.getId(),
-                        newTerritory.getDog().getName(), row.getOverlapRatio()));
+                        savedIntrusion.getId(),
+                        victim.getId(),
+                        victim.getDog().getId(),
+                        victim.getDog().getName(),
+                        newTerritory.getId(),
+                        newTerritory.getDog().getId(),
+                        newTerritory.getDog().getName(),
+                        row.getOverlapRatio(),
+                        stolenArea,
+                        remainderArea,
+                        victimStatusAfter
+                ));
             }
 
             results.add(new Result(

@@ -3,14 +3,13 @@ package com.ne7k.safepaw.auth.controller;
 import com.ne7k.safepaw.auth.dto.request.SocialLoginRequest;
 import com.ne7k.safepaw.auth.dto.request.TokenRefreshRequest;
 import com.ne7k.safepaw.auth.dto.response.AuthTokenResponse;
-import com.ne7k.safepaw.auth.dto.response.AuthUserResponse;
 import com.ne7k.safepaw.auth.service.RefreshTokenService;
 import com.ne7k.safepaw.auth.service.SocialAuthService;
 import com.ne7k.safepaw.global.response.ApiResponse;
 import com.ne7k.safepaw.global.security.CustomUserDetails;
+import com.ne7k.safepaw.notification.service.DeviceTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -21,8 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.security.Security;
-
 @Tag( name = "Auth", description = "소셜 로그인") // swagger
 @RestController
 @RequiredArgsConstructor
@@ -31,6 +28,7 @@ public class AuthController {
 
     private final SocialAuthService socialAuthService;
     private final RefreshTokenService refreshTokenService;
+    private final DeviceTokenService deviceTokenService;
 
     @Operation(summary = "소셜 로그인") // swagger
     @PostMapping("/social")
@@ -63,6 +61,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@AuthenticationPrincipal CustomUserDetails principal) {
         refreshTokenService.revokeAll(principal.getUserId());
+        deviceTokenService.unregisterAll(principal.getUserId());
         return ApiResponse.ok(null);
     }
 
