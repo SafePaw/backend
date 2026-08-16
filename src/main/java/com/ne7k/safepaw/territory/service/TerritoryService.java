@@ -1,5 +1,6 @@
 package com.ne7k.safepaw.territory.service;
 
+import com.ne7k.safepaw.crew.repository.CrewMemberRepository;
 import com.ne7k.safepaw.dog.domain.Dog;
 import com.ne7k.safepaw.dog.repository.DogRepository;
 import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class TerritoryService {
     private final SeasonService seasonService;
     private final XpService xpService;
     private final MarkerUrlResolver markerUrlResolver;
+    private final CrewMemberRepository crewMemberRepository;
 
     @Transactional
     public WalkFinishResponse finishAndClaim(WalkSession session, List<RedisWalkPoint> valid,
@@ -109,19 +113,50 @@ public class TerritoryService {
 
     @Transactional(readOnly = true)
     public TerritoryResponse getDetail(Long territoryId, Long viewerUserId) {
-        return toResponse(findById(territoryId), viewerUserId);
+        Territory t = findById(territoryId);
+        return toResponses(List.of(t), viewerUserId).get(0);
     }
 
     @Transactional(readOnly = true)
     public List<TerritoryResponse> findInBbox(
             double swLng, double swLat, double neLng, double neLat, Long viewerUserId) {
-        return territoryRepository.findActiveInBbox(swLng, swLat, neLng, neLat).stream()
-                .map(t -> toResponse(t, viewerUserId))
-                .toList();
+        return toResponses(
+                territoryRepository.findActiveInBbox(swLng, swLat, neLng, neLat),
+                viewerUserId);
     }
 
     public TerritoryResponse toResponse(Territory t, Long viewerUserId) {
-        var marker = markerUrlResolver.resolveFields(t.getDog().getMarkerImageKey());
-        return TerritoryResponse.from(t, viewerUserId, marker);
+        return toResponses(List.of(t), viewerUserId).get(0);
+    }
+
+    public List<TerritoryResponse> toResponses(List<Territory> list, Long viewerUserId) {
+        Map<Long, TerritoryResponse.CrewPart> crewByOwner = loadCrewParts(list);
+        return list.stream()
+                .map(t -> {
+                    var marker = markerUrlResolver.resolveFields(t.getDog().getMarkerImageKey());
+                    Long ownerId = t.getDog().getOwner().getId();
+                    return TerritoryResponse.from(t, viewerUserId, marker, crewByOwner.get(ownerId));
+                })
+                .toList();
+    }
+
+    private Map<Long, TerritoryResponse.CrewPart> loadCrewParts(List<Territory> list) {
+        List<Long> ownerIds = list.stream()
+                .map(t -> t.getDog().getOwner().getId())
+                .distinct()
+                .toList();
+        if (ownerIds.isEmpty()) {
+            return Map.of();
+        }
+        return crewMemberRepository.findAllByUser_IdIn(ownerIds).stream()
+                .collect(Collectors.toMap(
+                        m -> m.getUser().getId(),
+                        m -> new TerritoryResponse.CrewPart(
+                                m.getCrew().getId(),
+                                m.getCrew().getName(),
+                                m.getCrew().getTerritoryColor(),
+                                markerUrlResolver.resolve(m.getCrew().getImageKey())
+                        )
+                ));
     }
 }

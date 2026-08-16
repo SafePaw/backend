@@ -1,5 +1,8 @@
 package com.ne7k.safepaw.ranking.controller;
 
+import com.ne7k.safepaw.crew.dto.response.CrewRankingBoardResponse;
+import com.ne7k.safepaw.crew.dto.response.MyCrewRankingResponse;
+import com.ne7k.safepaw.crew.service.CrewRankingQueryService;
 import com.ne7k.safepaw.global.response.ApiResponse;
 import com.ne7k.safepaw.global.security.CustomUserDetails;
 import com.ne7k.safepaw.ranking.domain.RankingCategory;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RankingController {
 
     private final RankingQueryService rankingQueryService;
+    private final CrewRankingQueryService crewRankingQueryService;
 
     @GetMapping("/xp")
     @Operation(summary = "시즌 XP 랭킹 (메인)", security = @SecurityRequirement(name = "bearerAuth"))
@@ -67,5 +71,22 @@ public class RankingController {
             @RequestParam(required = false) String season,
             @RequestParam Long dogId) {
         return ApiResponse.ok(rankingQueryService.me(principal.getUserId(), season, dogId));
+    }
+
+    @GetMapping("/crew-territory")
+    @Operation(summary = "시즌 크루 영토 면적 랭킹", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<CrewRankingBoardResponse> crewTerritory(
+            @RequestParam(required = false) String season,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(crewRankingQueryService.board(season, page, size));
+    }
+
+    @GetMapping("/crew-territory/me")
+    @Operation(summary = "내 크루 시즌 영토 순위", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<MyCrewRankingResponse> myCrewTerritory(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(required = false) String season) {
+        return ApiResponse.ok(crewRankingQueryService.me(principal.getUserId(), season));
     }
 }

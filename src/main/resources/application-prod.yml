@@ -95,3 +95,7 @@ safepaw:
 
   dog:
     max-per-user: 5
+
+  crew:
+    max-members: 20
+    invite-code-length: 8

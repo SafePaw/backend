@@ -59,10 +59,21 @@ public enum ErrorCode {
     NOTIFY_DEVICE_TOKEN_INVALID (HttpStatus.UNPROCESSABLE_ENTITY, "FCM 토큰이 유효하지 않습니다."),
 
     // -------- 시즌 / 랭킹 (SEASON_*) --------
-    SEASON_NOT_FOUND          (HttpStatus.NOT_FOUND,          "시즌을 찾을 수 없습니다.");
+    SEASON_NOT_FOUND          (HttpStatus.NOT_FOUND,          "시즌을 찾을 수 없습니다."),
+
+    // -------- 크루 (CREW_*) --------
+    CREW_NOT_FOUND            (HttpStatus.NOT_FOUND,            "크루를 찾을 수 없습니다."),
+    CREW_NOT_JOINED           (HttpStatus.NOT_FOUND,            "가입한 크루가 없습니다."),
+    CREW_ALREADY_JOINED       (HttpStatus.CONFLICT,             "이미 크루에 가입되어 있습니다."),
+    CREW_NAME_DUPLICATED      (HttpStatus.CONFLICT,             "이미 사용 중인 크루 이름입니다."),
+    CREW_MEMBER_LIMIT         (HttpStatus.UNPROCESSABLE_ENTITY, "크루 인원이 가득 찼습니다."),
+    CREW_NOT_MEMBER           (HttpStatus.FORBIDDEN,            "해당 크루의 멤버가 아닙니다."),
+    CREW_NOT_LEADER           (HttpStatus.FORBIDDEN,            "크루 리더만 할 수 있습니다."),
+    CREW_INVALID_INVITE       (HttpStatus.UNPROCESSABLE_ENTITY, "초대 코드가 올바르지 않습니다."),
+    CREW_LEADER_CANNOT_LEAVE  (HttpStatus.CONFLICT,             "리더는 위임하거나 해산한 뒤에 나갈 수 있습니다."),
+    CREW_CANNOT_KICK_SELF     (HttpStatus.CONFLICT,             "자기 자신은 강퇴할 수 없습니다."),
+    CREW_TRANSFER_NOT_MEMBER  (HttpStatus.UNPROCESSABLE_ENTITY, "위임 대상이 크루 멤버가 아닙니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
-    // ... constructor, getters
-
 }

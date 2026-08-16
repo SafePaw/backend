@@ -13,7 +13,8 @@ public record TerritoryResponse(
         boolean isMine,
         String status,
         OffsetDateTime claimedAt,
-        OffsetDateTime conqueredAt
+        OffsetDateTime conqueredAt,
+        CrewPart crew
 ) {
     public record DogPart(
             Long id,
@@ -25,10 +26,18 @@ public record TerritoryResponse(
             String markerImageValue
     ) {}
 
+    public record CrewPart(
+            Long id,
+            String name,
+            String territoryColor,
+            String imageUrl
+    ) {}
+
     public static TerritoryResponse from(
             Territory t,
             Long viewerUserId,
-            MarkerUrlResolver.MarkerFields marker
+            MarkerUrlResolver.MarkerFields marker,
+            CrewPart crew
     ) {
         var d = t.getDog();
         return new TerritoryResponse(
@@ -47,7 +56,8 @@ public record TerritoryResponse(
                 d.isOwnedBy(viewerUserId),
                 t.getStatus().name(),
                 t.getClaimedAt(),
-                t.getConqueredAt()
+                t.getConqueredAt(),
+                crew
         );
     }
 }
