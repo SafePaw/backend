@@ -15,19 +15,25 @@ import com.ne7k.safepaw.walk.repository.WalkPointRepository;
 import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
 import com.ne7k.safepaw.walk.repository.redis.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WalkSessionService {
@@ -41,8 +47,9 @@ public class WalkSessionService {
     private final WalkLockManager lockManager;
     private final WalkValidator validator;
     private final TerritoryService territoryService;
+    private final CalorieCalculator calorieCalculator;
+    private final PlatformTransactionManager transactionManager;
 
-    // ---------- 시작 ----------
     public WalkStartResponse start(Long userId, Long dogId) {
         Dog dog = dogRepository.findByIdAndOwner_Id(dogId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOG_NOT_FOUND));
@@ -60,12 +67,13 @@ public class WalkSessionService {
         return WalkStartResponse.from(saved);
     }
 
-    @Transactional
-    protected WalkSession persistStart(Dog dog) {
-        walkSessionRepository.findActiveByDogId(dog.getId()).ifPresent(w -> {
-            throw new BusinessException(ErrorCode.WALK_ONGOING_EXISTS);
+    private WalkSession persistStart(Dog dog) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            walkSessionRepository.findActiveByDogId(dog.getId()).ifPresent(w -> {
+                throw new BusinessException(ErrorCode.WALK_ONGOING_EXISTS);
+            });
+            return walkSessionRepository.save(WalkSession.start(dog));
         });
-        return walkSessionRepository.save(WalkSession.start(dog));
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +93,6 @@ public class WalkSessionService {
         return ActiveWalkListResponse.of(walks);
     }
 
-    /** set10: 산책 기록 목록 */
     @Transactional(readOnly = true)
     public Page<WalkHistoryItemResponse> listHistory(
             Long userId,
@@ -117,8 +124,11 @@ public class WalkSessionService {
 
         Map<Long, Territory> territoryByWalkId = loadTerritoriesForSessions(sessions.getContent());
 
-        return sessions.map(w -> WalkHistoryItemResponse.from(
-                w, territoryByWalkId.get(w.getId())));
+        return sessions.map(w -> {
+            double distance = w.getDistanceMeters() == null ? 0 : w.getDistanceMeters();
+            Double calories = calorieCalculator.kcal(w.getDog().getWeightKg(), distance);
+            return WalkHistoryItemResponse.from(w, territoryByWalkId.get(w.getId()), calories);
+        });
     }
 
     private Map<Long, Territory> loadTerritoriesForSessions(List<WalkSession> sessions) {
@@ -134,7 +144,6 @@ public class WalkSessionService {
                 ));
     }
 
-    // ---------- 종료 ----------
     public WalkFinishResponse finish(Long userId, Long walkId, List<WalkPointDto> lastPoints) {
         WalkSession session = walkSessionRepository.findByIdAndDog_Owner_Id(walkId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WALK_NOT_FOUND));
@@ -142,32 +151,60 @@ public class WalkSessionService {
             throw new BusinessException(ErrorCode.WALK_ALREADY_FINISHED);
         }
 
-        List<RedisWalkPoint> all = new java.util.ArrayList<>(buffer.drain(walkId));
+        List<RedisWalkPoint> buffered = new ArrayList<>(buffer.peek(walkId));
         if (lastPoints != null) {
-            lastPoints.forEach(p -> all.add(new RedisWalkPoint(
+            lastPoints.forEach(p -> buffered.add(new RedisWalkPoint(
                     p.lng(), p.lat(), p.accuracyMeters(), p.speedKmh(), p.recordedAt())));
         }
-        all.sort(Comparator.comparing(RedisWalkPoint::recordedAt));
+        buffered.sort(Comparator.comparing(RedisWalkPoint::recordedAt));
 
-        WalkValidator.Result vr = validator.filter(null, null, null, all);
+        WalkValidator.Result vr = validator.filter(null, null, null, buffered);
         List<RedisWalkPoint> valid = vr.accepted();
 
-        int duration = valid.isEmpty() ? 0
+        int gpsSpan = valid.isEmpty() ? 0
                 : (int) java.time.Duration.between(valid.get(0).recordedAt(),
                 valid.get(valid.size() - 1).recordedAt()).getSeconds();
+        int duration = Math.max(0, gpsSpan - pausedSeconds(walkId));
         double distance = vr.addedMeters();
-        double avgSpeed = GeoUtils.speedKmh(distance, duration);
 
         WalkFinishResponse response = territoryService.finishAndClaim(
-                session, valid, distance, duration, avgSpeed);
+                session, valid, distance, duration);
 
-        stateCache.evict(walkId);
-        lockManager.release(userId);
-        buffer.evict(walkId);
+        safeEvict(walkId, userId);
         return response;
     }
 
-    // ---------- 중도 포기 ----------
+    private int pausedSeconds(Long walkId) {
+        try {
+            WalkState state = stateCache.get(walkId);
+            long total = state.totalPausedSeconds();
+            if (state.isPaused() && state.pausedAt() != null) {
+                total += java.time.Duration.between(state.pausedAt(), OffsetDateTime.now()).getSeconds();
+            }
+            return (int) Math.max(0, total);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void safeEvict(Long walkId, Long userId) {
+        try {
+            buffer.evict(walkId);
+        } catch (Exception e) {
+            log.warn("walk buffer evict failed walkId={}", walkId, e);
+        }
+        try {
+            stateCache.evict(walkId);
+        } catch (Exception e) {
+            log.warn("walk state evict failed walkId={}", walkId, e);
+        }
+        try {
+            lockManager.release(userId);
+        } catch (Exception e) {
+            log.warn("walk lock release failed userId={}", userId, e);
+        }
+    }
+
     @Transactional
     public void abort(Long userId, Long walkId) {
         WalkSession session = walkSessionRepository.findByIdAndDog_Owner_Id(walkId, userId)
@@ -178,7 +215,6 @@ public class WalkSessionService {
         lockManager.release(userId);
     }
 
-    // ---------- 상세 ----------
     @Transactional(readOnly = true)
     public WalkDetailResponse detail(Long userId, Long walkId) {
         WalkSession s = walkSessionRepository.findByIdAndDog_Owner_Id(walkId, userId)
@@ -187,6 +223,8 @@ public class WalkSessionService {
         Long territoryId = territoryRepository.findByWalkSession_Id(walkId)
                 .map(Territory::getId)
                 .orElse(null);
-        return WalkDetailResponse.from(s, lngLat, territoryId);
+        double distance = s.getDistanceMeters() == null ? 0 : s.getDistanceMeters();
+        Double calories = calorieCalculator.kcal(s.getDog().getWeightKg(), distance);
+        return WalkDetailResponse.from(s, lngLat, territoryId, calories);
     }
 }
