@@ -13,11 +13,15 @@ import java.util.List;
 public class WalkPointRedisBuffer {
 
     private final StringRedisTemplate redis;
+    // json 변환
     private final ObjectMapper mapper;
+    // 키 만료
     private static final Duration TTL = Duration.ofHours(24);
 
+    // 키 구조
     private String key(long walkId) { return "walk:points:" + walkId; }
 
+    // 적재
     public void rpushAll(long walkId, List<RedisWalkPoint> points) {
         if (points.isEmpty()) return;
         String[] serialized = points.stream().map(this::toJson).toArray(String[]::new);
@@ -25,19 +29,7 @@ public class WalkPointRedisBuffer {
         redis.expire(key(walkId), TTL);
     }
 
-    /**
-     * [추가] 읽기 전용 — Redis 데이터 유지.
-     * finish 시 DB 커밋 성공 전까지 데이터를 지우지 않기 위해 사용.
-     */
-    public List<RedisWalkPoint> peek(long walkId) {
-        String k = key(walkId);
-        List<String> raw = redis.opsForList().range(k, 0, -1);
-        return raw == null ? List.of() : raw.stream().map(this::fromJson).toList();
-    }
-
-    /**
-     * [기존] 읽고 즉시 삭제 — abort / evict 전용으로만 사용.
-     */
+    // 종료 시 한 번에 가져오고 키 제거
     public List<RedisWalkPoint> drain(long walkId) {
         String k = key(walkId);
         List<String> raw = redis.opsForList().range(k, 0, -1);
@@ -51,7 +43,6 @@ public class WalkPointRedisBuffer {
         try { return mapper.writeValueAsString(p); }
         catch (Exception e) { throw new IllegalStateException("RedisWalkPoint 직렬화 실패", e); }
     }
-
     private RedisWalkPoint fromJson(String s) {
         try { return mapper.readValue(s, RedisWalkPoint.class); }
         catch (Exception e) { throw new IllegalStateException("RedisWalkPoint 역직렬화 실패", e); }

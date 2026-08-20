@@ -2,7 +2,6 @@ package com.ne7k.safepaw.territory.service;
 
 import com.ne7k.safepaw.crew.repository.CrewMemberRepository;
 import com.ne7k.safepaw.dog.domain.Dog;
-import com.ne7k.safepaw.dog.domain.DogRank;
 import com.ne7k.safepaw.dog.repository.DogRepository;
 import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
 import com.ne7k.safepaw.global.exception.BusinessException;
@@ -20,7 +19,6 @@ import com.ne7k.safepaw.walk.dto.response.WalkFinishResponse;
 import com.ne7k.safepaw.walk.repository.WalkPointRepository;
 import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
 import com.ne7k.safepaw.walk.repository.redis.RedisWalkPoint;
-import com.ne7k.safepaw.walk.service.CalorieCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,11 +42,10 @@ public class TerritoryService {
     private final XpService xpService;
     private final MarkerUrlResolver markerUrlResolver;
     private final CrewMemberRepository crewMemberRepository;
-    private final CalorieCalculator calorieCalculator;
 
     @Transactional
     public WalkFinishResponse finishAndClaim(WalkSession session, List<RedisWalkPoint> valid,
-                                             double distance, int duration) {
+                                             double distance, int duration, double avgSpeed) {
         Long walkId = session.getId();
         WalkSession managedSession = walkSessionRepository.findById(walkId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WALK_NOT_FOUND));
@@ -62,21 +59,16 @@ public class TerritoryService {
 
         managedSession.complete(distance, duration, valid.size());
 
-        Double calories = calorieCalculator.kcal(dog.getWeightKg(), distance);
-
         Season season = seasonService.currentSeason();
 
         TerritoryEligibility.Outcome outcome =
                 eligibility.evaluate(dog.getId(), walkId, duration, valid.size());
 
-        DogRank rankBefore = dog.getRank();
-
         if (!outcome.eligible()) {
             var grants = xpService.award(dog, season, managedSession, null, false, false);
-            boolean rankUp = dog.getRank() != rankBefore;
-            return WalkFinishResponse.normal(managedSession, distance, duration,
-                    valid.size(), outcome.loopGapMeters(), calories,
-                    outcome.reason().name(), outcome.message(), grants, dog, rankUp);
+            return WalkFinishResponse.normal(managedSession, distance, duration, avgSpeed,
+                    valid.size(), outcome.loopGapMeters(),
+                    outcome.reason().name(), outcome.message(), grants, dog);
         }
 
         boolean firstClaim = !territoryRepository.existsByDog_IdAndStatus(
@@ -85,6 +77,7 @@ public class TerritoryService {
         Territory territory = territoryRepository.save(
                 Territory.claim(dog, managedSession, season, outcome.polygon(), outcome.areaSquareMeters()));
 
+        // 1) 타 dog: 최근 점령 우선 Difference (동일 유저 다른 견 포함, FCM은 타인만)
         List<PartialConquestService.Result> intrusions;
         try {
             Long ownerId = dog.getOwner().getId();
@@ -93,6 +86,7 @@ public class TerritoryService {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "부분 점령 처리 실패");
         }
 
+        // 2) 동일 dog 겹침: 합집합으로 신규에 추가 저장, 구 ACTIVE CONQUERED
         try {
             territoryMergeService.mergeOverlappingSameDog(territory, outcome.wkt());
         } catch (BusinessException e) {
@@ -101,14 +95,14 @@ public class TerritoryService {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "동일견 영토 병합 실패");
         }
 
+        // Union 후 면적은 territory.areaSquareMeters 사용
         double finalArea = territory.getAreaSquareMeters();
 
         var grants = xpService.award(dog, season, managedSession, territory, true, firstClaim);
-        boolean rankUp = dog.getRank() != rankBefore;
 
-        return WalkFinishResponse.territory(managedSession, distance, duration,
-                valid.size(), outcome.loopGapMeters(), calories, territory, finalArea,
-                intrusions, grants, dog, rankUp);
+        return WalkFinishResponse.territory(managedSession, distance, duration, avgSpeed,
+                valid.size(), outcome.loopGapMeters(), territory, finalArea,
+                intrusions, grants, dog);
     }
 
     @Transactional(readOnly = true)
