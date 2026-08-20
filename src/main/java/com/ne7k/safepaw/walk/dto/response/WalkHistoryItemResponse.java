@@ -2,7 +2,6 @@ package com.ne7k.safepaw.walk.dto.response;
 
 import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.walk.domain.WalkSession;
-import com.ne7k.safepaw.walk.service.GeoUtils;
 
 import java.time.OffsetDateTime;
 
@@ -17,22 +16,15 @@ public record WalkHistoryItemResponse(
         WalkStats stats,
         WalkHistoryTerritorySummary territory
 ) {
-    public static WalkHistoryItemResponse from(WalkSession w, Territory territoryOrNull) {
+    public static WalkHistoryItemResponse from(
+            WalkSession w,
+            Territory territoryOrNull,
+            Double caloriesKcal
+    ) {
         double distance = w.getDistanceMeters() == null ? 0 : w.getDistanceMeters();
         int duration = w.getDurationSeconds() == null ? 0 : w.getDurationSeconds();
-        long durationSec = duration;
-        double avgSpeed = GeoUtils.speedKmh(distance, durationSec);
 
         String walkType = territoryOrNull != null ? "TERRITORY" : "NORMAL";
-
-        WalkStats stats = new WalkStats(
-                distance,
-                duration,
-                avgSpeed,
-                w.getPointCount(),
-                null
-        );
-
         WalkHistoryTerritorySummary territorySummary = territoryOrNull != null
                 ? WalkHistoryTerritorySummary.from(territoryOrNull)
                 : null;
@@ -45,7 +37,7 @@ public record WalkHistoryItemResponse(
                 walkType,
                 w.getStartedAt(),
                 w.getEndedAt(),
-                stats,
+                WalkStats.of(distance, duration, w.getPointCount(), null, caloriesKcal),
                 territorySummary
         );
     }

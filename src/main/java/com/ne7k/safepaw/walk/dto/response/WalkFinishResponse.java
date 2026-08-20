@@ -42,12 +42,13 @@ public record WalkFinishResponse(
     }
 
     public static WalkFinishResponse territory(
-            WalkSession s, double distance, int duration, double avgSpeed, int pointCount,
-            Double loopGap, Territory t, double area,
-            List<PartialConquestService.Result> intr, List<XpService.Grant> grants, Dog dog) {
+            WalkSession s, double distance, int duration, int pointCount,
+            Double loopGap, Double caloriesKcal, Territory t, double area,
+            List<PartialConquestService.Result> intr, List<XpService.Grant> grants,
+            Dog dog, boolean rankUp) {
         return new WalkFinishResponse(
                 s.getId(), s.getStatus().name(), "TERRITORY",
-                new WalkStats(distance, duration, avgSpeed, pointCount, loopGap),
+                WalkStats.of(distance, duration, pointCount, loopGap, caloriesKcal),
                 new TerritoryPart(t.getId(), GeoJsonGeometry.from(t.getGeom()), area),
                 null, null,
                 intr.stream().map(i -> new IntrusionPart(
@@ -55,16 +56,17 @@ public record WalkFinishResponse(
                         i.stolenPolygon(),
                         i.victimRemainderPolygon(),
                         i.victimRemainderAreaSquareMeters(), i.victimStatusAfter())).toList(),
-                toXp(grants), dog.getTotalXp(), dog.getRank().name(), false);
+                toXp(grants), dog.getTotalXp(), dog.getRank().name(), rankUp);
     }
 
     public static WalkFinishResponse normal(
-            WalkSession s, double distance, int duration, double avgSpeed, int pointCount,
-            Double loopGap, String reason, String message, List<XpService.Grant> grants, Dog dog) {
+            WalkSession s, double distance, int duration, int pointCount,
+            Double loopGap, Double caloriesKcal, String reason, String message,
+            List<XpService.Grant> grants, Dog dog, boolean rankUp) {
         return new WalkFinishResponse(
                 s.getId(), s.getStatus().name(), "NORMAL",
-                new WalkStats(distance, duration, avgSpeed, pointCount, loopGap),
+                WalkStats.of(distance, duration, pointCount, loopGap, caloriesKcal),
                 null, reason, message, List.of(),
-                toXp(grants), dog.getTotalXp(), dog.getRank().name(), false);
+                toXp(grants), dog.getTotalXp(), dog.getRank().name(), rankUp);
     }
 }
