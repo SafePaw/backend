@@ -57,3 +57,6 @@ application-secret*.yml
 docker/.env*
 
 secrets/firebase*.json
+
+# 스크립트 파일
+scripts/*
