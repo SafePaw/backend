@@ -10,7 +10,6 @@ import java.util.List;
 
 public interface WalkPointRepository extends JpaRepository<WalkPoint, Long> {
 
-    // 산책 경로 폴리곤 조회
     @Query(value = """
         SELECT ST_X(wp.geom) AS lng, ST_Y(wp.geom) AS lat
         FROM walk_points wp
@@ -18,6 +17,26 @@ public interface WalkPointRepository extends JpaRepository<WalkPoint, Long> {
         ORDER BY wp.recorded_at ASC
         """, nativeQuery = true)
     List<Object[]> findLngLatByWalkSessionId(@Param("walkId") Long walkId);
+
+    /** Redis 버퍼 만료 시 DB 폴백용 — 시간 순 정렬 */
+    List<WalkPoint> findByWalkSession_IdOrderByRecordedAtAsc(Long walkSessionId);
+
+    long countByWalkSession_Id(Long walkSessionId);
+
+    /**
+     * DB에 저장된 walk_points로 총 이동 거리(m) 계산.
+     * Redis 버퍼 만료 시 WalkSessionService.finish() 에서 사용.
+     */
+    @Query(value = """
+        SELECT COALESCE(SUM(ST_DistanceSphere(lag_geom, geom)), 0)
+        FROM (
+            SELECT geom, LAG(geom) OVER (ORDER BY recorded_at) AS lag_geom
+            FROM walk_points
+            WHERE walk_session_id = :walkId
+        ) sub
+        WHERE lag_geom IS NOT NULL
+        """, nativeQuery = true)
+    double computeTotalDistanceMeters(@Param("walkId") Long walkId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

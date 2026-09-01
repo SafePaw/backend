@@ -104,12 +104,14 @@ public class CrewService {
 
     @Transactional
     public void kick(Long leaderUserId, Long crewId, Long targetUserId) {
-        requireLeader(crewId, leaderUserId);
+        Crew crew = requireLeader(crewId, leaderUserId);
         if (leaderUserId.equals(targetUserId)) {
             throw new BusinessException(ErrorCode.CREW_CANNOT_KICK_SELF);
         }
         requireMember(crewId, targetUserId);
         crewMemberRepository.deleteByCrewIdAndUserId(crewId, targetUserId);
+        // 강퇴된 멤버가 기존 초대 코드로 재가입하지 못하도록 코드 자동 갱신
+        crew.rotateInviteCode(newInviteCode());
     }
 
     @Transactional

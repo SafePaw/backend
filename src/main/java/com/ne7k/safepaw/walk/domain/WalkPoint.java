@@ -1,6 +1,15 @@
 package com.ne7k.safepaw.walk.domain;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,7 +20,9 @@ import java.time.OffsetDateTime;
 @Entity
 @Getter
 @Table(name = "walk_points",
-        indexes = @Index(name = "idx_walk_points_session_time", columnList = "walk_session_id, recorded_at"))
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_walk_points_session_time",
+                columnNames = {"walk_session_id", "recorded_at"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WalkPoint {
 

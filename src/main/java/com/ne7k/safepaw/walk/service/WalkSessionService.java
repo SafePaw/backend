@@ -151,32 +151,76 @@ public class WalkSessionService {
             throw new BusinessException(ErrorCode.WALK_ALREADY_FINISHED);
         }
 
+        // ① Redis 버퍼에서 GPS 포인트 로드
         List<RedisWalkPoint> buffered = new ArrayList<>(buffer.peek(walkId));
+        boolean redisEmpty = buffered.isEmpty();
+
+        // ② Redis가 비어있으면 DB 폴백 (앱 재시작·Redis TTL 만료 대응)
+        if (redisEmpty) {
+            long dbCount = walkPointRepository.countByWalkSession_Id(walkId);
+            if (dbCount > 0) {
+                log.info("walk finish: Redis 버퍼 없음 (walkId={}), DB {}개 포인트로 폴백", walkId, dbCount);
+                walkPointRepository.findByWalkSession_IdOrderByRecordedAtAsc(walkId)
+                        .forEach(p -> buffered.add(new RedisWalkPoint(
+                                p.getLng(), p.getLat(), p.getAccuracyMeters(),
+                                p.getSpeedKmh(), p.getRecordedAt())));
+            } else {
+                log.warn("walk finish: Redis·DB 모두 GPS 없음 (walkId={}), 0 데이터 종료", walkId);
+            }
+        }
+
+        // ③ lastPoints(클라이언트 미업로드 최신 배치) 합산
         if (lastPoints != null) {
             lastPoints.forEach(p -> buffered.add(new RedisWalkPoint(
                     p.lng(), p.lat(), p.accuracyMeters(), p.speedKmh(), p.recordedAt())));
         }
         buffered.sort(Comparator.comparing(RedisWalkPoint::recordedAt));
 
+        // ④ 유효 포인트 필터 — buffered는 전체 누적 포인트이므로 prev 컨텍스트 없이 처음부터 재필터링
+        // (prevAt을 넘기면 그 시각 이전 포인트가 dt<=0 조건에 걸려 전부 폐기되는 버그 발생)
+        WalkState state = safeGetState(walkId);
+
         WalkValidator.Result vr = validator.filter(null, null, null, buffered);
         List<RedisWalkPoint> valid = vr.accepted();
 
+        // ⑤ duration: GPS 시간 범위 - 일시정지 시간
         int gpsSpan = valid.isEmpty() ? 0
-                : (int) java.time.Duration.between(valid.get(0).recordedAt(),
+                : (int) java.time.Duration.between(
+                valid.get(0).recordedAt(),
                 valid.get(valid.size() - 1).recordedAt()).getSeconds();
-        int duration = Math.max(0, gpsSpan - pausedSeconds(walkId));
-        double distance = vr.addedMeters();
+        int duration = Math.max(0, gpsSpan - pausedSeconds(walkId, state));
+
+        // ⑥ distance: Redis 폴백이면 validator 계산값 사용; DB 폴백이면 DB에서 직접 집계
+        double distance;
+        if (!redisEmpty || valid.isEmpty()) {
+            distance = vr.addedMeters();
+        } else {
+            // DB 폴백: validator는 prevLng=null로 시작해 첫 포인트 거리를 0으로 계산
+            // DB 집계 쿼리가 더 정확하지만, 이미 DB에 저장된 포인트 기준이므로
+            // valid가 DB 포인트만 있을 때(lastPoints 없음)는 DB 합산 사용
+            distance = (lastPoints == null || lastPoints.isEmpty())
+                    ? walkPointRepository.computeTotalDistanceMeters(walkId)
+                    : vr.addedMeters();
+        }
 
         WalkFinishResponse response = territoryService.finishAndClaim(
-                session, valid, distance, duration);
+                session, valid, distance, duration, redisEmpty);
 
         safeEvict(walkId, userId);
         return response;
     }
 
-    private int pausedSeconds(Long walkId) {
+    private WalkState safeGetState(Long walkId) {
         try {
-            WalkState state = stateCache.get(walkId);
+            return stateCache.get(walkId);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private int pausedSeconds(Long walkId, WalkState state) {
+        try {
+            if (state == null) return 0;
             long total = state.totalPausedSeconds();
             if (state.isPaused() && state.pausedAt() != null) {
                 total += java.time.Duration.between(state.pausedAt(), OffsetDateTime.now()).getSeconds();

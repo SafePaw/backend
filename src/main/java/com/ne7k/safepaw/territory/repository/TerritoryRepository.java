@@ -41,7 +41,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
           SELECT ST_MakeValid(
                    COALESCE(
                      NULLIF(ST_BuildArea(ring), 'GEOMETRYCOLLECTION EMPTY'::geometry),
-                     ST_CollectionExtract(ST_Polygonize(ST_Node(ring)), 3)
+                     ST_CollectionExtract(ST_Polygonize(ARRAY[ST_Node(ring)]), 3)
                    )
                  ) AS geom
           FROM closed
@@ -57,7 +57,7 @@ public interface TerritoryRepository extends JpaRepository<Territory, Long> {
             AND ST_Area(part::geography) >= :minPartAreaSqm
         ),
         merged AS (
-          SELECT ST_Union(ST_Collect(part)) AS geom FROM filtered
+          SELECT ST_UnaryUnion(ST_Collect(part)) AS geom FROM filtered
         )
         SELECT ST_AsText(
                  ST_ForcePolygonCCW(

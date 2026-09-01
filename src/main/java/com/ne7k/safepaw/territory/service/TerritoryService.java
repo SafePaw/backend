@@ -14,10 +14,9 @@ import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.domain.TerritoryStatus;
 import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
-import com.ne7k.safepaw.walk.domain.WalkPoint;
 import com.ne7k.safepaw.walk.domain.WalkSession;
 import com.ne7k.safepaw.walk.dto.response.WalkFinishResponse;
-import com.ne7k.safepaw.walk.repository.WalkPointRepository;
+import com.ne7k.safepaw.walk.repository.WalkPointBatchInsert;
 import com.ne7k.safepaw.walk.repository.WalkSessionRepository;
 import com.ne7k.safepaw.walk.repository.redis.RedisWalkPoint;
 import com.ne7k.safepaw.walk.service.CalorieCalculator;
@@ -35,7 +34,7 @@ public class TerritoryService {
 
     private final DogRepository dogRepository;
     private final WalkSessionRepository walkSessionRepository;
-    private final WalkPointRepository walkPointRepository;
+    private final WalkPointBatchInsert walkPointBatchInsert;
     private final TerritoryRepository territoryRepository;
     private final TerritoryEligibility eligibility;
     private final PartialConquestService partialConquest;
@@ -46,19 +45,27 @@ public class TerritoryService {
     private final CrewMemberRepository crewMemberRepository;
     private final CalorieCalculator calorieCalculator;
 
+    /**
+     * 산책 종료 + 영토 점령 처리.
+     *
+     * @param valid      Redis 버퍼(또는 lastPoints)에서 필터링된 유효 GPS 포인트.
+     *                   DB 폴백(redisWasEmpty=true) 이면 이미 DB에 저장된 포인트이므로 재저장 생략.
+     * @param redisWasEmpty true = Redis 버퍼가 비어있었고 DB 폴백을 사용한 경우
+     */
     @Transactional
     public WalkFinishResponse finishAndClaim(WalkSession session, List<RedisWalkPoint> valid,
-                                             double distance, int duration) {
+                                             double distance, int duration, boolean redisWasEmpty) {
         Long walkId = session.getId();
         WalkSession managedSession = walkSessionRepository.findById(walkId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WALK_NOT_FOUND));
         Dog dog = dogRepository.findById(managedSession.getDog().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.DOG_NOT_FOUND));
 
-        List<WalkPoint> entities = valid.stream()
-                .map(p -> WalkPoint.of(managedSession, p.lng(), p.lat(), p.accuracyMeters(), p.speedKmh(), p.recordedAt()))
-                .toList();
-        walkPointRepository.saveAll(entities);
+        // GPS 포인트 DB 저장 (ON CONFLICT DO NOTHING: 중복 없이 안전하게)
+        // - redisWasEmpty=true  → DB 폴백 포인트는 이미 저장됨. lastPoints 포함 valid만 저장 시도
+        // - redisWasEmpty=false → Redis 포인트 전체 + lastPoints 저장 시도
+        // 두 경우 모두 ON CONFLICT DO NOTHING 이 중복을 처리
+        walkPointBatchInsert.batchInsert(walkId, valid);
 
         managedSession.complete(distance, duration, valid.size());
 

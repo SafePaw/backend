@@ -2,6 +2,7 @@ package com.ne7k.safepaw.walk.repository.redis;
 
 import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
+import com.ne7k.safepaw.walk.config.WalkProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -16,9 +17,13 @@ import java.util.Map;
 public class WalkSessionStateCache {
 
     private final StringRedisTemplate redis;
-    private static final Duration TTL = Duration.ofHours(24);
+    private final WalkProperties walkProperties;
 
     private String key(long walkId) { return "walk:state:" + walkId; }
+
+    private Duration ttl() {
+        return Duration.ofHours(walkProperties.session().bufferTtlHours());
+    }
 
     public void init(long walkId, long userId, long dogId, OffsetDateTime startedAt) {
         Map<String, String> h = new HashMap<>();
@@ -29,7 +34,7 @@ public class WalkSessionStateCache {
         h.put("totalMeters", "0");
         h.put("totalPausedSeconds", "0");
         redis.opsForHash().putAll(key(walkId), h);
-        redis.expire(key(walkId), TTL);
+        redis.expire(key(walkId), ttl());
     }
 
     public WalkState get(long walkId) {
@@ -44,24 +49,20 @@ public class WalkSessionStateCache {
         String k = key(walkId);
         Map<Object, Object> current = redis.opsForHash().entries(k);
 
-        // prev ← 기존 last
         if (current.get("lastLng") != null) {
             redis.opsForHash().put(k, "prevLng", (String) current.get("lastLng"));
             redis.opsForHash().put(k, "prevLat", (String) current.get("lastLat"));
             redis.opsForHash().put(k, "prevAt",  (String) current.get("lastAt"));
         }
 
-        // last ← 새 포인트
         redis.opsForHash().put(k, "lastLng", String.valueOf(newLast.lng()));
         redis.opsForHash().put(k, "lastLat", String.valueOf(newLast.lat()));
         redis.opsForHash().put(k, "lastAt",  newLast.recordedAt().toString());
 
-        // 누적 거리 · 개수
         redis.opsForHash().increment(k, "pointCount", addedCount);
         double oldTotal = parseDoubleOr(current, "totalMeters", 0.0);
         redis.opsForHash().put(k, "totalMeters", String.valueOf(oldTotal + addedMeters));
 
-        // bbox 갱신
         updateBbox(k, current, newLast.lng(), newLast.lat());
     }
 
@@ -77,12 +78,10 @@ public class WalkSessionStateCache {
         redis.opsForHash().put(k, "maxLat", String.valueOf(Math.max(maxLat, lat)));
     }
 
-    /** 일시정지: pausedAt 저장 */
     public void markPaused(long walkId) {
         redis.opsForHash().put(key(walkId), "pausedAt", OffsetDateTime.now().toString());
     }
 
-    /** 재개: pausedAt → totalPausedSeconds 누적 후 삭제 */
     public void markResumed(long walkId) {
         String k = key(walkId);
         Map<Object, Object> h = redis.opsForHash().entries(k);
