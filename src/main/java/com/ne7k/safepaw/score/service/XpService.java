@@ -25,12 +25,17 @@ public class XpService {
 
     private final XpLedgerRepository xpLedgerRepository;
 
-    /** 같은 트랜잭션에서 호출. dog.gainXp + 원장 기록 + 랭크 전이. 부여 내역 반환 */
+    /**
+     * 같은 트랜잭션에서 호출. dog.gainXp + 원장 기록 + 랭크 전이. 부여 내역 반환.
+     * WALK_COMPLETED 는 3분 이상 + 산책 면적 50㎡ 이상일 때만.
+     */
     public List<Grant> award(Dog dog, Season season, WalkSession walk, Territory territory,
-                             boolean territoryClaimed, boolean firstClaim) {
+                             boolean walkCompleted, boolean territoryClaimed, boolean firstClaim) {
         List<Grant> grants = new ArrayList<>();
 
-        grant(dog, season, XpSource.WALK_COMPLETED, XP_WALK_COMPLETED, walk, null, grants);
+        if (walkCompleted) {
+            grant(dog, season, XpSource.WALK_COMPLETED, XP_WALK_COMPLETED, walk, null, grants);
+        }
         if (territoryClaimed) {
             grant(dog, season, XpSource.TERRITORY_CLAIMED, XP_TERRITORY_CLAIMED, walk, territory, grants);
             if (firstClaim) {

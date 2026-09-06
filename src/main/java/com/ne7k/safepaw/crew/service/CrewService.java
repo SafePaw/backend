@@ -268,7 +268,7 @@ public class CrewService {
 
     private BusinessException translateConstraint(DataIntegrityViolationException e) {
         String msg = String.valueOf(e.getMostSpecificCause().getMessage());
-        if (msg.contains("uq_crews_name")) {
+        if (msg.contains("uq_crews_name") || msg.contains("uq_crews_name_lower")) {
             return new BusinessException(ErrorCode.CREW_NAME_DUPLICATED);
         }
         if (msg.contains("uq_crew_members_user")) {

@@ -21,9 +21,10 @@ safepaw:
     batch:
       max-points: 60               # /points 한 번에 허용하는 최대 포인트(5분치)
     session:
-      min-duration-seconds: 180    # 영토 인정 최소 산책 시간
+      min-duration-seconds: 180    # 영토 인정 · 산책 완료 XP 최소 시간
       lock-ttl-hours: 2            # 단일 산책 락 TTL
       buffer-ttl-hours: 24         # Redis 버퍼/상태 TTL
+      min-xp-area-square-meters: 50  # 산책 완료 XP 최소 면적 (영토 최소 100㎡와 별개)
 
   territory:
     loop-close-meters: 50

@@ -11,9 +11,11 @@ import java.util.Optional;
 
 public interface CrewRepository extends JpaRepository<Crew, Long> {
 
-    boolean existsByName(String name);
+    @Query("SELECT COUNT(c) > 0 FROM Crew c WHERE LOWER(c.name) = LOWER(:name)")
+    boolean existsByName(@Param("name") String name);
 
-    boolean existsByNameAndIdNot(String name, Long id);
+    @Query("SELECT COUNT(c) > 0 FROM Crew c WHERE LOWER(c.name) = LOWER(:name) AND c.id <> :id")
+    boolean existsByNameAndIdNot(@Param("name") String name, @Param("id") Long id);
 
     boolean existsByInviteCode(String inviteCode);
 
