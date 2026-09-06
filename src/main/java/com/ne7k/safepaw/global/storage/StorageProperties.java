@@ -13,6 +13,7 @@ public record StorageProperties(
         boolean pathStyleAccess,
         String bucketMarkers,
         String bucketPresets,
+        String bucketShareCards,
         String publicBaseUrl
 ) {
 }
