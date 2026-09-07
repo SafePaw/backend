@@ -14,6 +14,7 @@ import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.domain.TerritoryStatus;
 import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
+import com.ne7k.safepaw.walk.config.WalkProperties;
 import com.ne7k.safepaw.walk.domain.WalkSession;
 import com.ne7k.safepaw.walk.dto.response.WalkFinishResponse;
 import com.ne7k.safepaw.walk.repository.WalkPointBatchInsert;
@@ -44,6 +45,7 @@ public class TerritoryService {
     private final MarkerUrlResolver markerUrlResolver;
     private final CrewMemberRepository crewMemberRepository;
     private final CalorieCalculator calorieCalculator;
+    private final WalkProperties walkProperties;
 
     /**
      * 산책 종료 + 영토 점령 처리.
@@ -78,8 +80,11 @@ public class TerritoryService {
 
         DogRank rankBefore = dog.getRank();
 
+        boolean walkCompletedXp = isWalkCompletedXpEligible(duration, outcome.areaSquareMeters());
+
         if (!outcome.eligible()) {
-            var grants = xpService.award(dog, season, managedSession, null, false, false);
+            var grants = xpService.award(dog, season, managedSession, null,
+                    walkCompletedXp, false, false);
             boolean rankUp = dog.getRank() != rankBefore;
             return WalkFinishResponse.normal(managedSession, distance, duration,
                     valid.size(), outcome.loopGapMeters(), calories,
@@ -110,7 +115,8 @@ public class TerritoryService {
 
         double finalArea = territory.getAreaSquareMeters();
 
-        var grants = xpService.award(dog, season, managedSession, territory, true, firstClaim);
+        var grants = xpService.award(dog, season, managedSession, territory,
+                walkCompletedXp, true, firstClaim);
         boolean rankUp = dog.getRank() != rankBefore;
 
         return WalkFinishResponse.territory(managedSession, distance, duration,
@@ -151,6 +157,14 @@ public class TerritoryService {
                     return TerritoryResponse.from(t, viewerUserId, marker, crewByOwner.get(ownerId));
                 })
                 .toList();
+    }
+
+    /** 산책 완료 XP: 3분 이상 + 경로 면적 50㎡ 이상. 영토 점령 조건(100㎡·루프 닫힘)과는 별개. */
+    private boolean isWalkCompletedXpEligible(int durationSeconds, Double areaSquareMeters) {
+        var session = walkProperties.session();
+        return durationSeconds >= session.minDurationSeconds()
+                && areaSquareMeters != null
+                && areaSquareMeters >= session.minXpAreaSquareMeters();
     }
 
     private Map<Long, TerritoryResponse.CrewPart> loadCrewParts(List<Territory> list) {

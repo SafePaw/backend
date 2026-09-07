@@ -1,6 +1,7 @@
 package com.ne7k.safepaw.walk.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties(prefix = "safepaw.walk")
 public record WalkProperties(
@@ -12,5 +13,10 @@ public record WalkProperties(
     public record Gps(double maxAccuracyMeters, double minSpeedKmh, double maxSpeedKmh,
                       double jumpDistanceMeters, int jumpMinIntervalSeconds) {}
     public record Batch(int maxPoints) {}
-    public record Session(int minDurationSeconds, int lockTtlHours, int bufferTtlHours) {}
+    public record Session(
+            int minDurationSeconds,
+            int lockTtlHours,
+            int bufferTtlHours,
+            @DefaultValue("50") double minXpAreaSquareMeters
+    ) {}
 }
