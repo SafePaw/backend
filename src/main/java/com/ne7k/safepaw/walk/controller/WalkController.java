@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @Tag(name = "Walks")
 @RestController
 @RequestMapping("/api/v1/walks")
@@ -24,6 +26,8 @@ public class WalkController {
     private final WalkPointAppendService appendService;
     private final WalkLiveService walkLiveService;
     private final WalkPauseService walkPauseService;
+    private final WalkSummaryService walkSummaryService;
+    private final WalkShareCardService walkShareCardService;
 
     @PostMapping
     @Operation(summary = "산책 시작", security = @SecurityRequirement(name = "bearerAuth"))
@@ -103,5 +107,43 @@ public class WalkController {
             @AuthenticationPrincipal CustomUserDetails principal,
             @PathVariable Long walkId) {
         return ApiResponse.ok(walkPauseService.resume(principal.getUserId(), walkId));
+    }
+
+    // -------- set19: 산책 결과 요약 / 공유 카드 --------
+
+    @GetMapping("/{walkId}/summary")
+    @Operation(summary = "산책 결과 요약 (공유 카드 렌더링용)", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<WalkSummaryResponse> summary(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId) {
+        return ApiResponse.ok(walkSummaryService.summary(principal.getUserId(), walkId));
+    }
+
+    @GetMapping("/{walkId}/share-card/upload-url")
+    @Operation(summary = "공유 카드 이미지 업로드 presigned URL 발급", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<ShareCardUploadUrlResponse> shareCardUploadUrl(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId,
+            @RequestParam String type,
+            @RequestParam String contentType) {
+        return ApiResponse.ok(walkShareCardService.uploadUrl(principal.getUserId(), walkId, type, contentType));
+    }
+
+    @PostMapping("/{walkId}/share-card")
+    @Operation(summary = "공유 카드 저장/갱신", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ApiResponse<ShareCardResponse>> saveShareCard(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId,
+            @RequestBody ShareCardRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(walkShareCardService.save(principal.getUserId(), walkId, req)));
+    }
+
+    @GetMapping("/{walkId}/share-card")
+    @Operation(summary = "공유 카드 조회", security = @SecurityRequirement(name = "bearerAuth"))
+    public ApiResponse<ShareCardResponse> getShareCard(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long walkId) {
+        return ApiResponse.ok(walkShareCardService.get(principal.getUserId(), walkId));
     }
 }
