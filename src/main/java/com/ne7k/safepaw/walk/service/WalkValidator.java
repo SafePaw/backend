@@ -34,16 +34,20 @@ public class WalkValidator {
             if (p.accuracyMeters() > g.maxAccuracyMeters()) continue;
 
             if (pLng != null && pAt != null) {
-                long dt = Duration.between(pAt, p.recordedAt()).getSeconds();
-                if (dt <= 0) continue; // 시간 역행/중복
+                // getSeconds()는 1초 미만을 0으로 버려 고빈도 GPS가 전부 폐기되거나 속도가 왜곡됨
+                double dtSec = Duration.between(pAt, p.recordedAt()).toMillis() / 1000.0;
+                if (dtSec <= 0) continue; // 시간 역행/중복
                 double meters = GeoUtils.haversineMeters(pLng, pLat, p.lng(), p.lat());
 
                 // ④ 점프(텔레포트)
-                if (meters > g.jumpDistanceMeters() && dt < g.jumpMinIntervalSeconds()) continue;
+                if (meters > g.jumpDistanceMeters() && dtSec < g.jumpMinIntervalSeconds()) continue;
+
+                // GPS 정지 배회(3~8m)가 도보 속도로 잡혀 거리·칼로리가 부풀어 오르는 것 방지
+                if (meters < g.minStepMeters()) continue;
 
                 // ②③ 속도 구간 (영토 면적 왜곡 방지). 정지(<min)는 거리만 0 처리하고 점은 유지해도 되나
                 //      MVP 는 단순히 상·하한 벗어나면 폐기.
-                double kmh = GeoUtils.speedKmh(meters, dt);
+                double kmh = GeoUtils.speedKmh(meters, dtSec);
                 if (kmh < g.minSpeedKmh() || kmh > g.maxSpeedKmh()) continue;
 
                 addedMeters += meters;

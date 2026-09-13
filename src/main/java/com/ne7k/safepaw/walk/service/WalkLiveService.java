@@ -1,7 +1,5 @@
 package com.ne7k.safepaw.walk.service;
 
-import com.ne7k.safepaw.dog.domain.Dog;
-import com.ne7k.safepaw.dog.repository.DogRepository;
 import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.walk.domain.WalkSession;
@@ -14,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Service
@@ -23,7 +20,6 @@ public class WalkLiveService {
 
     private final WalkSessionRepository walkSessionRepository;
     private final WalkSessionStateCache stateCache;
-    private final DogRepository dogRepository;
     private final CalorieCalculator calorieCalculator;
 
     private static final double BBOX_SHAPE_FACTOR = 0.65;
@@ -55,7 +51,7 @@ public class WalkLiveService {
 
         double currentSpeed = 0.0;
         if (state.hasPrev() && state.hasLast()) {
-            long dt = java.time.Duration.between(state.prevAt(), state.lastAt()).getSeconds();
+            double dt = java.time.Duration.between(state.prevAt(), state.lastAt()).toMillis() / 1000.0;
             if (dt > 0) {
                 double d = GeoUtils.haversineMeters(
                         state.prevLng(), state.prevLat(), state.lastLng(), state.lastLat());
@@ -66,12 +62,7 @@ public class WalkLiveService {
 
         double territory = estimateTerritoryM2(state);
 
-        BigDecimal weight = null;
-        Dog dog = dogRepository.findById(state.dogId()).orElse(null);
-        if (dog != null) {
-            weight = dog.getWeightKg();
-        }
-        double calories = calorieCalculator.kcal(weight, totalMeters);
+        double calories = calorieCalculator.kcal(session.getDog().getWeightKg(), totalMeters);
 
         return new WalkLiveResponse(
                 walkId,

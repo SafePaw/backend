@@ -5,6 +5,7 @@ import com.ne7k.safepaw.score.service.XpService;
 import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.dto.response.GeoJsonGeometry;
 import com.ne7k.safepaw.territory.service.PartialConquestService;
+import com.ne7k.safepaw.territory.service.TerritoryMarker;
 import com.ne7k.safepaw.walk.domain.WalkSession;
 
 import java.util.List;
@@ -23,7 +24,13 @@ public record WalkFinishResponse(
         String rankAfter,
         boolean rankUp
 ) {
-    public record TerritoryPart(Long id, GeoJsonGeometry polygon, double areaSquareMeters) {}
+    public record TerritoryPart(
+            Long id,
+            GeoJsonGeometry polygon,
+            double areaSquareMeters,
+            Double markerLng,
+            Double markerLat
+    ) {}
 
     public record IntrusionPart(
             String victimDogName,
@@ -32,7 +39,9 @@ public record WalkFinishResponse(
             GeoJsonGeometry stolenPolygon,
             GeoJsonGeometry victimRemainderPolygon,
             double victimRemainderAreaSquareMeters,
-            String victimStatusAfter
+            String victimStatusAfter,
+            Double victimMarkerLng,
+            Double victimMarkerLat
     ) {}
 
     public record XpPart(String source, int amount) {}
@@ -49,14 +58,26 @@ public record WalkFinishResponse(
         return new WalkFinishResponse(
                 s.getId(), s.getStatus().name(), "TERRITORY",
                 WalkStats.of(distance, duration, pointCount, loopGap, caloriesKcal),
-                new TerritoryPart(t.getId(), GeoJsonGeometry.from(t.getGeom()), area),
+                toTerritoryPart(t, area),
                 null, null,
                 intr.stream().map(i -> new IntrusionPart(
                         i.victimDogName(), i.overlapRatio(), i.victimTerritoryId(),
                         i.stolenPolygon(),
                         i.victimRemainderPolygon(),
-                        i.victimRemainderAreaSquareMeters(), i.victimStatusAfter())).toList(),
+                        i.victimRemainderAreaSquareMeters(), i.victimStatusAfter(),
+                        i.victimMarkerLng(), i.victimMarkerLat())).toList(),
                 toXp(grants), dog.getTotalXp(), dog.getRank().name(), rankUp);
+    }
+
+    private static TerritoryPart toTerritoryPart(Territory t, double area) {
+        var markerPt = TerritoryMarker.ofActive(t);
+        return new TerritoryPart(
+                t.getId(),
+                GeoJsonGeometry.from(t.getGeom()),
+                area,
+                markerPt == null ? null : markerPt.lng(),
+                markerPt == null ? null : markerPt.lat()
+        );
     }
 
     public static WalkFinishResponse normal(

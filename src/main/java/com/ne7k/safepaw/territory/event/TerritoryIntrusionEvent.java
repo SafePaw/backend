@@ -12,5 +12,7 @@ public record TerritoryIntrusionEvent(
         double overlapRatio,
         double stolenAreaSquareMeters,
         double remainderAreaSquareMeters,
-        String victimStatusAfter
+        String victimStatusAfter,
+        Double victimMarkerLng,
+        Double victimMarkerLat
 ) {}

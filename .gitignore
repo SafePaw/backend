@@ -58,5 +58,7 @@ docker/.env*
 
 secrets/firebase*.json
 
-# 스크립트 파일
-scripts/*
+# 로컬 문서 / 인프라 / 스크립트 — SafePaw_backup 으로 관리
+/docs/
+/infra/
+/scripts/

@@ -10,8 +10,14 @@ public record WalkProperties(
         Batch batch,
         Session session
 ) {
-    public record Gps(double maxAccuracyMeters, double minSpeedKmh, double maxSpeedKmh,
-                      double jumpDistanceMeters, int jumpMinIntervalSeconds) {}
+    public record Gps(
+            double maxAccuracyMeters,
+            double minSpeedKmh,
+            double maxSpeedKmh,
+            double jumpDistanceMeters,
+            int jumpMinIntervalSeconds,
+            @DefaultValue("5") double minStepMeters
+    ) {}
     public record Batch(int maxPoints) {}
     public record Session(
             int minDurationSeconds,

@@ -90,6 +90,8 @@ public class PushNotificationService {
         data.put("stolenAreaSquareMeters", area);
         data.put("victimStatusAfter", p.victimStatusAfter());
         data.put("remainderAreaSquareMeters", String.valueOf(Math.round(p.remainderAreaSquareMeters())));
+        data.put("victimMarkerLng", p.victimMarkerLng() == null ? "" : String.valueOf(p.victimMarkerLng()));
+        data.put("victimMarkerLat", p.victimMarkerLat() == null ? "" : String.valueOf(p.victimMarkerLat()));
         data.put("deepLink", "/intrusions/" + p.intrusionId());
 
         sendToUser(p.victimUserId(), NotificationType.TERRITORY_INTRUSION,
@@ -142,6 +144,8 @@ public class PushNotificationService {
             double overlapRatio,
             double stolenAreaSquareMeters,
             double remainderAreaSquareMeters,
-            String victimStatusAfter
+            String victimStatusAfter,
+            Double victimMarkerLng,
+            Double victimMarkerLat
     ) {}
 }
