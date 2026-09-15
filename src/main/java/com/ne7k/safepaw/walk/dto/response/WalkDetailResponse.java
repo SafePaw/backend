@@ -11,13 +11,17 @@ public record WalkDetailResponse(
         OffsetDateTime startedAt, OffsetDateTime endedAt,
         WalkStats stats,
         GeoJsonLineString polyline,
-        Long territoryId
+        Long territoryId,
+        Double markerLng,
+        Double markerLat
 ) {
     public static WalkDetailResponse from(
             WalkSession w,
             List<Object[]> lngLatRows,
             Long territoryId,
-            Double caloriesKcal
+            Double caloriesKcal,
+            Double markerLng,
+            Double markerLat
     ) {
         double distance = w.getDistanceMeters() == null ? 0 : w.getDistanceMeters();
         int duration = w.getDurationSeconds() == null ? 0 : w.getDurationSeconds();
@@ -26,6 +30,8 @@ public record WalkDetailResponse(
                 w.getStartedAt(), w.getEndedAt(),
                 WalkStats.of(distance, duration, w.getPointCount(), null, caloriesKcal),
                 lngLatRows.isEmpty() ? null : GeoJsonLineString.from(lngLatRows),
-                territoryId);
+                territoryId,
+                markerLng,
+                markerLat);
     }
 }

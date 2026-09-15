@@ -6,6 +6,7 @@ import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
 import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.dto.response.GeoJsonGeometry;
 import com.ne7k.safepaw.territory.dto.response.TerritoryResponse;
+import com.ne7k.safepaw.territory.service.TerritoryMarker;
 
 import java.time.OffsetDateTime;
 
@@ -13,6 +14,8 @@ public record CrewTerritoryResponse(
         Long id,
         GeoJsonGeometry polygon,
         double areaSquareMeters,
+        Double markerLng,
+        Double markerLat,
         String status,
         OffsetDateTime claimedAt,
         OffsetDateTime conqueredAt,
@@ -29,10 +32,13 @@ public record CrewTerritoryResponse(
             String crewImageUrl
     ) {
         Dog d = t.getDog();
+        var markerPt = TerritoryMarker.ofActive(t);
         return new CrewTerritoryResponse(
                 t.getId(),
                 GeoJsonGeometry.from(t.getGeom()),
                 t.getAreaSquareMeters(),
+                markerPt == null ? null : markerPt.lng(),
+                markerPt == null ? null : markerPt.lat(),
                 t.getStatus().name(),
                 t.getClaimedAt(),
                 t.getConqueredAt(),

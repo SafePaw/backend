@@ -17,6 +17,11 @@ public final class GeoUtils {
 
     /** 두 포인트 사이 속도(km/h). dt(초) <= 0 이면 0 */
     public static double speedKmh(double meters, long seconds) {
+        return speedKmh(meters, (double) seconds);
+    }
+
+    /** 소수 초 지원. Duration.getSeconds() 절사로 속도가 왜곡되지 않게 한다. */
+    public static double speedKmh(double meters, double seconds) {
         if (seconds <= 0) return 0;
         return (meters / 1000.0) / (seconds / 3600.0);
     }

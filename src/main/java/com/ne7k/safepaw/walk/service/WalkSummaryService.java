@@ -3,10 +3,10 @@ package com.ne7k.safepaw.walk.service;
 import com.ne7k.safepaw.dog.service.MarkerUrlResolver;
 import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
-import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.dto.response.GeoJsonGeometry;
 import com.ne7k.safepaw.territory.dto.response.GeoJsonLineString;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
+import com.ne7k.safepaw.territory.service.TerritoryMarker;
 import com.ne7k.safepaw.walk.domain.WalkSession;
 import com.ne7k.safepaw.walk.dto.response.WalkStats;
 import com.ne7k.safepaw.walk.dto.response.WalkSummaryResponse;
@@ -46,11 +46,16 @@ public class WalkSummaryService {
         // 영토 (null 가능)
         WalkSummaryResponse.TerritoryPart territoryPart = territoryRepository
                 .findByWalkSession_Id(walkId)
-                .map(t -> new WalkSummaryResponse.TerritoryPart(
-                        t.getId(),
-                        GeoJsonGeometry.from(t.getGeom()),
-                        t.getAreaSquareMeters(),
-                        t.getClaimedAt()))
+                .map(t -> {
+                    var markerPt = TerritoryMarker.ofActive(t);
+                    return new WalkSummaryResponse.TerritoryPart(
+                            t.getId(),
+                            GeoJsonGeometry.from(t.getGeom()),
+                            t.getAreaSquareMeters(),
+                            markerPt == null ? null : markerPt.lng(),
+                            markerPt == null ? null : markerPt.lat(),
+                            t.getClaimedAt());
+                })
                 .orElse(null);
 
         // 사용자(닉네임) + 강아지(마커)

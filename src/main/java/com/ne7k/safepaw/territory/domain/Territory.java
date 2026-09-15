@@ -75,7 +75,7 @@ public class Territory {
         this.conqueredAt = OffsetDateTime.now();
     }
 
-    /** set11: Difference 잔여 — Polygon 또는 MultiPolygon */
+    /** set11: Difference 잔여. 마커는 컬럼이 없고 조회 시 새 geom으로 다시 계산한다. */
     public void shrinkToRemainder(MultiPolygon remainder, double remainderAreaSqm) {
         if (status != TerritoryStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 분할 가능");
@@ -89,7 +89,7 @@ public class Territory {
         this.areaSquareMeters = remainderAreaSqm;
     }
 
-    /** set9 merge: Union 결과 geom·면적 교체 */
+    /** set9 merge: Union 결과 geom·면적 교체. 마커도 조회 시 새 geom으로 다시 계산. */
     public void replaceGeom(MultiPolygon newGeom, double newAreaSquareMeters) {
         if (status != TerritoryStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.COMMON_INVALID_REQUEST, "ACTIVE 영토만 갱신 가능");

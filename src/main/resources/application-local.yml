@@ -18,6 +18,7 @@ safepaw:
       max-speed-kmh: 12.0          # 사람 도보 상한
       jump-distance-meters: 100    # 점프 판정 거리
       jump-min-interval-seconds: 10
+      min-step-meters: 5           # 이보다 짧은 이동은 GPS 노이즈로 폐기 (칼로리 부풀림 방지)
     batch:
       max-points: 60               # /points 한 번에 허용하는 최대 포인트(5분치)
     session:

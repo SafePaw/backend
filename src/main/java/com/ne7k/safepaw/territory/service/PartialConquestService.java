@@ -9,9 +9,9 @@ import com.ne7k.safepaw.territory.event.TerritoryIntrusionEvent;
 import com.ne7k.safepaw.territory.repository.TerritoryIntrusionRepository;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
 import lombok.RequiredArgsConstructor;
+import com.ne7k.safepaw.walk.domain.Geometries;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.MultiPolygon;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.WKTReader;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -28,7 +28,7 @@ public class PartialConquestService {
     private final TerritoryProperties territoryProps;
     private final TerritoryBuilder territoryBuilder;
     private final ApplicationEventPublisher publisher;
-    private final WKTReader wktReader = new WKTReader();
+    private final WKTReader wktReader = new WKTReader(Geometries.FACTORY);
 
     /**
      * 타 dog ACTIVE와 겹치면 기존 geom Difference.
@@ -51,7 +51,7 @@ public class PartialConquestService {
             }
 
             Geometry overlapGeom = wktReader.read(overlapWkt);
-            overlapGeom.setSRID(4326);
+            overlapGeom.setSRID(Geometries.SRID);
 
             Long victimOwnerId = victim.getDog().getOwner().getId();
             boolean crossOwner = !victimOwnerId.equals(myOwnerId);
@@ -68,23 +68,13 @@ public class PartialConquestService {
 
             if (remainWkt != null && !remainWkt.isBlank()) {
                 Geometry g = wktReader.read(remainWkt);
-                g.setSRID(4326);
-                if (!g.isEmpty()) {
-                    MultiPolygon remainderMp = null;
-                    if (g instanceof Polygon p) {
-                        remainderMp = TerritoryBuilder.toMultiPolygon(p);
-                    } else if (g instanceof MultiPolygon mp) {
-                        remainderMp = mp;
-                    }
-                    if (remainderMp != null) {
-                        remainderArea = territoryRepository.areaSquareMeters(remainWkt);
-                        if (remainderArea >= territoryProps.minAreaSquareMeters()) {
-                            victim.shrinkToRemainder(remainderMp, remainderArea);
-                            remainder = remainderMp;
-                        } else {
-                            victim.markConquered();
-                            victimStatusAfter = "CONQUERED";
-                        }
+                g.setSRID(Geometries.SRID);
+                MultiPolygon remainderMp = remainderMultiPolygon(g);
+                if (remainderMp != null) {
+                    remainderArea = territoryRepository.areaSquareMeters(remainWkt);
+                    if (remainderArea >= territoryProps.minAreaSquareMeters()) {
+                        victim.shrinkToRemainder(remainderMp, remainderArea);
+                        remainder = remainderMp;
                     } else {
                         victim.markConquered();
                         victimStatusAfter = "CONQUERED";
@@ -97,6 +87,10 @@ public class PartialConquestService {
                 victim.markConquered();
                 victimStatusAfter = "CONQUERED";
             }
+
+            var victimMarker = remainder != null ? TerritoryMarker.ofLargestPart(remainder) : null;
+            Double victimMarkerLng = victimMarker == null ? null : victimMarker.lng();
+            Double victimMarkerLat = victimMarker == null ? null : victimMarker.lat();
 
             if (crossOwner && savedIntrusion != null) {
                 double stolenArea = territoryRepository.areaSquareMeters(overlapWkt);
@@ -112,7 +106,9 @@ public class PartialConquestService {
                         row.getOverlapRatio(),
                         stolenArea,
                         remainderArea,
-                        victimStatusAfter
+                        victimStatusAfter,
+                        victimMarkerLng,
+                        victimMarkerLat
                 ));
             }
 
@@ -120,9 +116,23 @@ public class PartialConquestService {
                     victim.getId(), victim.getDog().getName(), row.getOverlapRatio(),
                     territoryBuilder.toGeoJson(overlapGeom),
                     remainder != null ? territoryBuilder.toGeoJson(remainder) : null,
-                    remainderArea, victimStatusAfter));
+                    remainderArea, victimStatusAfter,
+                    victimMarkerLng, victimMarkerLat));
         }
         return results;
+    }
+
+    /** PostGIS Difference는 Polygon / MultiPolygon / GeometryCollection을 줄 수 있다. */
+    static MultiPolygon remainderMultiPolygon(Geometry g) {
+        if (g == null || g.isEmpty()) {
+            return null;
+        }
+        try {
+            MultiPolygon mp = TerritoryBuilder.toMultiPolygon(g);
+            return mp.isEmpty() ? null : mp;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public record Result(
@@ -132,6 +142,8 @@ public class PartialConquestService {
             GeoJsonGeometry stolenPolygon,
             GeoJsonGeometry victimRemainderPolygon,
             double victimRemainderAreaSquareMeters,
-            String victimStatusAfter
+            String victimStatusAfter,
+            Double victimMarkerLng,
+            Double victimMarkerLat
     ) {}
 }

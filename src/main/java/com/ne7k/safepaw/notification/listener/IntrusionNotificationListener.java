@@ -35,7 +35,9 @@ public class IntrusionNotificationListener {
                 e.overlapRatio(),
                 e.stolenAreaSquareMeters(),
                 e.remainderAreaSquareMeters(),
-                e.victimStatusAfter()
+                e.victimStatusAfter(),
+                e.victimMarkerLng(),
+                e.victimMarkerLat()
         ));
     }
 }

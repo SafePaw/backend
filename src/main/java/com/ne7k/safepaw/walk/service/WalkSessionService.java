@@ -6,6 +6,7 @@ import com.ne7k.safepaw.global.exception.BusinessException;
 import com.ne7k.safepaw.global.exception.ErrorCode;
 import com.ne7k.safepaw.territory.domain.Territory;
 import com.ne7k.safepaw.territory.repository.TerritoryRepository;
+import com.ne7k.safepaw.territory.service.TerritoryMarker;
 import com.ne7k.safepaw.territory.service.TerritoryService;
 import com.ne7k.safepaw.walk.domain.WalkSession;
 import com.ne7k.safepaw.walk.domain.WalkStatus;
@@ -264,11 +265,14 @@ public class WalkSessionService {
         WalkSession s = walkSessionRepository.findByIdAndDog_Owner_Id(walkId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WALK_NOT_FOUND));
         List<Object[]> lngLat = walkPointRepository.findLngLatByWalkSessionId(walkId);
-        Long territoryId = territoryRepository.findByWalkSession_Id(walkId)
-                .map(Territory::getId)
-                .orElse(null);
+        var territory = territoryRepository.findByWalkSession_Id(walkId);
+        Long territoryId = territory.map(Territory::getId).orElse(null);
+        var markerPt = territory.map(TerritoryMarker::ofActive).orElse(null);
         double distance = s.getDistanceMeters() == null ? 0 : s.getDistanceMeters();
         Double calories = calorieCalculator.kcal(s.getDog().getWeightKg(), distance);
-        return WalkDetailResponse.from(s, lngLat, territoryId, calories);
+        return WalkDetailResponse.from(
+                s, lngLat, territoryId, calories,
+                markerPt == null ? null : markerPt.lng(),
+                markerPt == null ? null : markerPt.lat());
     }
 }

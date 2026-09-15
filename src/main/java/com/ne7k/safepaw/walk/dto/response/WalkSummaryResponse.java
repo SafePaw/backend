@@ -19,6 +19,8 @@ public record WalkSummaryResponse(
             Long id,
             GeoJsonGeometry polygon,
             double areaSquareMeters,
+            Double markerLng,
+            Double markerLat,
             OffsetDateTime claimedAt
     ) {}
 
